@@ -2,6 +2,7 @@ import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { Module, ValidationPipe } from '@nestjs/common';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
+import { AssistantModule } from './assistant/assistant.module';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthModule } from './auth/auth.module';
 import { config } from './config';
@@ -22,6 +23,7 @@ import { TasksModule } from './tasks/tasks.module';
     LeadsModule,
     PropertiesModule,
     TasksModule,
+    AssistantModule,
   ],
   controllers: [HealthController],
   providers: [
