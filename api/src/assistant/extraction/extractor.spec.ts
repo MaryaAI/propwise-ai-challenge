@@ -1,0 +1,125 @@
+import { MockLanguageModelV3 } from 'ai/test';
+import { Extraction } from './extraction.schema';
+import { ExtractionFailedError, Extractor } from './extractor';
+import { ConversationMessage } from './prompts';
+
+function usage() {
+  return {
+    inputTokens: { total: undefined, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
+    outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+  };
+}
+
+function textResult(payload: unknown) {
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
+    finishReason: { unified: 'stop' as const, raw: undefined },
+    usage: usage(),
+    warnings: [],
+  };
+}
+
+const KARIM_MESSAGE: ConversationMessage = {
+  id: 'msg-1',
+  direction: 'inbound',
+  sentAt: '2026-10-30T08:00:00Z',
+  body: "Hey, I'm looking for a 2-bedroom apartment in Dubai Marina, budget around 2M AED. Prefer something with a good rental yield. Can you follow up with me tomorrow?",
+};
+
+const BASE_INPUT = {
+  agencyName: 'Marina Bay Realty',
+  areas: ['Dubai Marina', 'Jumeirah Lake Towers'],
+  conversation: [KARIM_MESSAGE],
+  analysedMessageId: 'msg-1',
+};
+
+function karimExtraction(): Extraction {
+  return {
+    intent: 'requirements',
+    closed: false,
+    locations: { value: ['Dubai Marina'], evidence: { sourceId: 'msg-1', quote: 'Dubai Marina' }, status: 'stated' },
+    bedrooms: { value: { min: 2, max: 2 }, evidence: { sourceId: 'msg-1', quote: '2-bedroom' }, status: 'stated' },
+    budget: {
+      value: { minAed: null, maxAed: 2_000_000, qualifier: 'around' },
+      evidence: { sourceId: 'msg-1', quote: 'around 2M AED' },
+      status: 'stated',
+    },
+    propertyType: { value: 'apartment', evidence: { sourceId: 'msg-1', quote: 'apartment' }, status: 'stated' },
+    transaction: { value: null, evidence: null, status: 'missing' },
+    preferences: [{ text: 'good rental yield', evidence: { sourceId: 'msg-1', quote: 'good rental yield' } }],
+    followUp: {
+      value: { kind: 'tomorrow', weekday: null, days: null, time: null },
+      evidence: { sourceId: 'msg-1', quote: 'tomorrow' },
+      status: 'stated',
+    },
+    propertyRefs: [],
+  };
+}
+
+function extractorWith(...results: unknown[]): Extractor {
+  const model = new MockLanguageModelV3({ doGenerate: results as never });
+  return new Extractor(() => model);
+}
+
+describe('Extractor', () => {
+  it('extracts a well-evidenced requirements message', async () => {
+    const extractor = extractorWith(textResult(karimExtraction()));
+    const result = await extractor.extract(BASE_INPUT);
+
+    expect(result.intent).toBe('requirements');
+    expect(result.closed).toBe(false);
+    expect(result.update.locations).toEqual({ value: ['Dubai Marina'], source: 'msg-1', evidence: { sourceId: 'msg-1', quote: 'Dubai Marina' } });
+    expect(result.update.bedrooms?.value).toEqual({ min: 2, max: 2 });
+    expect(result.update.budget?.value).toEqual({ minAed: null, maxAed: 2_000_000, qualifier: 'around' });
+    expect(result.update.propertyType?.value).toBe('apartment');
+    expect(result.update.transaction).toBeUndefined();
+    expect(result.update.preferences).toEqual([{ value: 'good rental yield', source: 'msg-1', evidence: { sourceId: 'msg-1', quote: 'good rental yield' } }]);
+    expect(result.followUp).toEqual({ kind: 'tomorrow', weekday: null, days: null, time: null, raw: 'tomorrow' });
+    expect(result.propertyRefs).toEqual([]);
+    expect(result.rejected).toEqual([]);
+  });
+
+  it('downgrades a field whose evidence quote is not actually in the cited message', async () => {
+    const extraction = karimExtraction();
+    extraction.transaction = { value: 'buy', evidence: { sourceId: 'msg-1', quote: 'this text is not in the message' }, status: 'stated' };
+    const extractor = extractorWith(textResult(extraction));
+
+    const result = await extractor.extract(BASE_INPUT);
+
+    expect(result.update.transaction).toBeUndefined();
+    expect(result.rejected).toContainEqual({ field: 'transaction', reason: 'evidence quote not found in the cited message' });
+  });
+
+  it('downgrades a field whose evidence cites a message id that was never given', async () => {
+    const extraction = karimExtraction();
+    extraction.propertyType = { value: 'villa', evidence: { sourceId: 'msg-999', quote: 'apartment' }, status: 'stated' };
+    const extractor = extractorWith(textResult(extraction));
+
+    const result = await extractor.extract(BASE_INPUT);
+
+    expect(result.update.propertyType).toBeUndefined();
+    expect(result.rejected).toContainEqual({ field: 'propertyType', reason: 'evidence quote not found in the cited message' });
+  });
+
+  it('excludes a location that is not one of the agency areas, even with valid evidence', async () => {
+    const extraction = karimExtraction();
+    extraction.locations = { value: ['Downtown Dubai'], evidence: { sourceId: 'msg-1', quote: 'Dubai Marina' }, status: 'stated' };
+    const extractor = extractorWith(textResult(extraction));
+
+    const result = await extractor.extract(BASE_INPUT);
+
+    expect(result.update.locations).toBeUndefined();
+    expect(result.rejected).toContainEqual({ field: 'locations', reason: '"Downtown Dubai" is not one of this agency\'s areas' });
+  });
+
+  it('retries once on a schema-invalid response, then succeeds', async () => {
+    const extractor = extractorWith(textResult({ not: 'the right shape' }), textResult(karimExtraction()));
+    const result = await extractor.extract(BASE_INPUT);
+    expect(result.intent).toBe('requirements');
+  });
+
+  it('fails after a second schema-invalid response', async () => {
+    const extractor = extractorWith(textResult({ not: 'the right shape' }), textResult({ still: 'wrong' }));
+    await expect(extractor.extract(BASE_INPUT)).rejects.toBeInstanceOf(ExtractionFailedError);
+  });
+});
