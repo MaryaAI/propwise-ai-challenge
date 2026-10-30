@@ -60,7 +60,9 @@ export class AssistantService {
     private readonly agentRunner: AgentRunner,
   ) {}
 
-  async run(input: { agencyId: string; agentId: string; leadId: string; messageId?: string }): Promise<{ run: AssistantRun; actions: AssistantAction[] }> {
+  async run(
+    input: { agencyId: string; agentId: string; leadId: string; messageId?: string },
+  ): Promise<{ run: AssistantRun; actions: AssistantAction[]; agentTimezone: string }> {
     const agent = await this.em.findOneOrFail(Agent, input.agentId, { populate: ['agency'] });
 
     const context = await loadRunContext({
@@ -74,9 +76,10 @@ export class AssistantService {
 
     const abortSignal = AbortSignal.timeout(RUN_TIMEOUT_MS);
 
+    let persisted: { run: AssistantRun; actions: AssistantAction[] };
     try {
       const outcome = await this.analyse(input.agencyId, agent, context, abortSignal);
-      return this.persist({
+      persisted = await this.persist({
         agencyId: input.agencyId,
         agentId: agent.id,
         leadId: input.leadId,
@@ -87,7 +90,7 @@ export class AssistantService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const trace = error instanceof Error ? (error as Error & { trace?: Trace }).trace : undefined;
-      return this.persist({
+      persisted = await this.persist({
         agencyId: input.agencyId,
         agentId: agent.id,
         leadId: input.leadId,
@@ -102,6 +105,18 @@ export class AssistantService {
         trace: trace ? trace.toContract() : [],
       });
     }
+    return { ...persisted, agentTimezone: agent.timezone };
+  }
+
+  async getRun(agencyId: string, leadId: string, runId: string): Promise<{ run: AssistantRun; actions: AssistantAction[] } | null> {
+    const run = await this.em.findOne(
+      AssistantRun,
+      { id: runId, lead: leadId, agency: agencyId },
+      { populate: ['lead', 'message', 'createdBy'] },
+    );
+    if (!run) return null;
+    const actions = await this.em.find(AssistantAction, { run });
+    return { run, actions };
   }
 
   private async analyse(agencyId: string, agent: Agent, context: Awaited<ReturnType<typeof loadRunContext>>, abortSignal: AbortSignal) {
