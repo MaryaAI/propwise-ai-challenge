@@ -8,13 +8,13 @@ Done when: `pnpm check` is green.
 
 - [x] `CLAUDE.md`
 - [x] `PLAN.md` (this file)
-- [ ] `assistant-run.entity.ts` and `assistant-action.entity.ts` per architecture section 5
-- [ ] Register both entities in `entities/index.ts` and `mikro-orm.config.ts`
-- [ ] Generate and review the migration (`db:migrate` then `db:migration:create`)
-- [ ] `pnpm db:reset` proves the migration applies cleanly
-- [ ] Empty `AssistantModule`, imported in `AppModule`
-- [ ] Add `luxon` and `@types/luxon` to `api`
-- [ ] `pnpm check` green
+- [x] `assistant-run.entity.ts` and `assistant-action.entity.ts` per architecture section 5
+- [x] Register both entities in `entities/index.ts` and `mikro-orm.config.ts`
+- [x] Generate and review the migration (`db:migrate` then `db:migration:create`)
+- [x] `pnpm db:reset` proves the migration applies cleanly
+- [x] Empty `AssistantModule`, imported in `AppModule`
+- [x] Add `luxon` and `@types/luxon` to `api`
+- [x] `pnpm check` green
 
 ## Phase 2 — Deterministic logic (35 min)
 
