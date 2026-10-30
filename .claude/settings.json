@@ -1,0 +1,5 @@
+{
+  "permissions": {
+    "deny": ["Read(./api/.env)", "Read(./web/.env.local)", "Read(./mobile/.env)"]
+  }
+}
