@@ -7,7 +7,11 @@ import { buildAgentSystemPrompt, buildAgentUserPrompt } from './prompts';
 import { createTrace, Trace } from './tracing';
 import { ToolsFactory } from './tools';
 
-export class AgentFailedError extends Error {}
+export class AgentFailedError extends Error {
+  constructor(message: string, public readonly trace: Trace) {
+    super(message);
+  }
+}
 
 export interface AgentRunResult {
   output: FinalOutput;
@@ -50,8 +54,11 @@ export class AgentRunner {
       return { output: result.output, trace };
     } catch (error) {
       if (NoOutputGeneratedError.isInstance(error) || NoObjectGeneratedError.isInstance(error)) {
-        throw new AgentFailedError(error.message);
+        throw new AgentFailedError(error.message, trace);
       }
+      // Any other error (ToolInfraError, an abort, ...) propagates as-is, but still carries the
+      // trace gathered so far -- architecture section 3.8: trace/steps survive a failed run for diagnosis.
+      if (error instanceof Error) (error as Error & { trace?: Trace }).trace = trace;
       throw error;
     }
   }

@@ -44,6 +44,7 @@ export interface PropertyFacts {
   id: string;
   agencyId: string;
   reference: string;
+  title: string;
   area: string;
   type: string;
   bedrooms: number;

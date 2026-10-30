@@ -8,6 +8,7 @@ import { effectiveMaxAed, filterRecommendations, hasYieldPreference, selectRecom
 interface PropertySeed {
   agency: string;
   reference: string;
+  title: string;
   area: string;
   type: string;
   bedrooms: number;
@@ -26,6 +27,7 @@ const facts = new Map<string, PropertyFacts>(
       id: stableId('property', p.reference),
       agencyId: stableId('agency', p.agency),
       reference: p.reference,
+      title: p.title,
       area: p.area,
       type: p.type,
       bedrooms: p.bedrooms,

@@ -205,6 +205,7 @@ export class PropertyQuery {
         id: row.id,
         agencyId,
         reference: row.reference,
+        title: row.title,
         area: row.area,
         type: row.type,
         bedrooms: row.bedrooms,
@@ -214,5 +215,12 @@ export class PropertyQuery {
       });
     }
     return facts;
+  }
+
+  async distinctAreas(agencyId: string): Promise<string[]> {
+    const rows = await this.em
+      .getConnection()
+      .execute<{ area: string }[]>('select distinct area from properties where agency_id = ? order by area', [agencyId]);
+    return rows.map((row) => row.area);
   }
 }
