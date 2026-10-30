@@ -5,6 +5,8 @@ import { hashPassword } from '../auth/password';
 import {
   Agency,
   Agent,
+  AssistantAction,
+  AssistantRun,
   Lead,
   LeadSource,
   LeadStatus,
@@ -86,6 +88,8 @@ export async function seed(em: EntityManager, now: Date = new Date()): Promise<v
   const ago = (ms: number) => new Date(now.getTime() - ms);
 
   await em.transactional(async (tx) => {
+    await tx.nativeDelete(AssistantAction, {});
+    await tx.nativeDelete(AssistantRun, {});
     await tx.nativeDelete(Task, {});
     await tx.nativeDelete(Message, {});
     await tx.nativeDelete(Lead, {});
