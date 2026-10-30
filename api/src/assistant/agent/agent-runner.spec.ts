@@ -1,5 +1,5 @@
 import { MockLanguageModelV3 } from 'ai/test';
-import { ContractRequirements } from '../types';
+import { AgentRequirementsBrief } from '../types';
 import { PropertyQuery } from './property-query';
 import { ToolsFactory } from './tools';
 import { AgentFailedError, AgentRunner } from './agent-runner';
@@ -29,10 +29,10 @@ function toolCallStep(toolCallId: string, toolName: string, input: unknown) {
   };
 }
 
-const REQUIREMENTS: ContractRequirements = {
+const REQUIREMENTS: AgentRequirementsBrief = {
   locations: ['Dubai Marina'],
-  bedrooms: 2,
-  budgetAed: { min: null, max: 2_000_000 },
+  bedroomsRange: { min: 2, max: 2 },
+  budget: { minAed: null, maxAed: 2_000_000, qualifier: 'around', effectiveMaxAed: 2_100_000 },
   propertyType: 'apartment',
   intent: 'buy',
   preferences: ['good rental yield'],

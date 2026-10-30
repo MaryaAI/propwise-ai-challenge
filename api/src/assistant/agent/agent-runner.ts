@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { generateText, NoObjectGeneratedError, NoOutputGeneratedError, Output, stepCountIs } from 'ai';
 import { AssistantModelFactory, ASSISTANT_MODEL_FACTORY } from '../model';
-import { ContractRequirements } from '../types';
+import { AgentRequirementsBrief } from '../types';
 import { FinalOutput, FinalSchema } from './final-schema';
 import { buildAgentSystemPrompt, buildAgentUserPrompt } from './prompts';
 import { createTrace, Trace } from './tracing';
@@ -29,7 +29,7 @@ export class AgentRunner {
     agencyId: string;
     agencyName: string;
     agentName: string;
-    requirements: ContractRequirements;
+    requirements: AgentRequirementsBrief;
     abortSignal?: AbortSignal;
   }): Promise<AgentRunResult> {
     const abortController = new AbortController();

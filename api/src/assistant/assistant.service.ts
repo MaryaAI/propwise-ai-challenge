@@ -8,7 +8,7 @@ import { Trace } from './agent/tracing';
 import { loadRunContext } from './context';
 import { ExtractionFailedError, Extractor } from './extraction/extractor';
 import { computeDueAt } from './policy/follow-up-date';
-import { bedroomsRange, mergeRequirements, toContractRequirements } from './policy/merge';
+import { bedroomsRange, mergeRequirements, toAgentBrief, toContractRequirements } from './policy/merge';
 import { filterRecommendations, grossYield, selectRecommendations } from './policy/guardrails';
 import { route } from './policy/router';
 import { clarifyTemplate, closedTemplate, rentTemplate, TemplateOutput } from './policy/templates';
@@ -143,7 +143,7 @@ export class AssistantService {
         agencyId,
         agencyName: agent.agency.name,
         agentName: agent.name,
-        requirements,
+        requirements: toAgentBrief(merged),
         abortSignal,
       });
       trace = agentResult.trace.toContract();

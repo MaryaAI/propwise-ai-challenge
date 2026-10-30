@@ -40,6 +40,21 @@ export interface ContractRequirements {
   preferences: string[];
 }
 
+/**
+ * What the agent sees, built from the same merged state as `ContractRequirements` but without the
+ * lossy collapses that shape needs for its own contract (bedroom range stays a range; the budget
+ * keeps its qualifier and an already-computed `effectiveMaxAed`, so the agent never has to redo
+ * that arithmetic itself).
+ */
+export interface AgentRequirementsBrief {
+  locations: string[];
+  bedroomsRange: { min: number; max: number } | null;
+  budget: { minAed: number | null; maxAed: number | null; qualifier: BudgetQualifier; effectiveMaxAed: number | null } | null;
+  propertyType: 'apartment' | 'villa' | 'townhouse' | 'penthouse' | null;
+  intent: 'buy' | 'rent' | 'unknown';
+  preferences: string[];
+}
+
 export interface PropertyFacts {
   id: string;
   agencyId: string;

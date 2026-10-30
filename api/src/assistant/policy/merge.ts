@@ -1,4 +1,5 @@
-import { ContractRequirements, RequirementsState } from '../types';
+import { AgentRequirementsBrief, ContractRequirements, RequirementsState } from '../types';
+import { effectiveMaxAed } from './guardrails';
 
 const EMPTY_STATE: RequirementsState = {
   locations: null,
@@ -32,6 +33,19 @@ export function toContractRequirements(state: RequirementsState): ContractRequir
     locations: state.locations?.value ?? [],
     bedrooms: bedrooms !== null && bedrooms.value.min === bedrooms.value.max ? bedrooms.value.min : null,
     budgetAed: { min: state.budget?.value.minAed ?? null, max: state.budget?.value.maxAed ?? null },
+    propertyType: state.propertyType?.value ?? null,
+    intent: state.transaction === null ? 'unknown' : state.transaction.value,
+    preferences: state.preferences.map((p) => p.value),
+  };
+}
+
+/** What the agent sees: unlike `toContractRequirements`, the bedroom range and budget qualifier survive. */
+export function toAgentBrief(state: RequirementsState): AgentRequirementsBrief {
+  const budget = state.budget?.value ?? null;
+  return {
+    locations: state.locations?.value ?? [],
+    bedroomsRange: state.bedrooms?.value ?? null,
+    budget: budget && { ...budget, effectiveMaxAed: effectiveMaxAed(budget) },
     propertyType: state.propertyType?.value ?? null,
     intent: state.transaction === null ? 'unknown' : state.transaction.value,
     preferences: state.preferences.map((p) => p.value),

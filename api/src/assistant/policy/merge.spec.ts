@@ -1,4 +1,4 @@
-import { bedroomsRange, mergeRequirements, toContractRequirements } from './merge';
+import { bedroomsRange, mergeRequirements, toAgentBrief, toContractRequirements } from './merge';
 import { RequirementsState, Sourced } from '../types';
 
 function sourced<T>(value: T, source = 'test'): Sourced<T> {
@@ -89,5 +89,38 @@ describe('toContractRequirements / bedroomsRange', () => {
       preferences: [],
     };
     expect(toContractRequirements(state).budgetAed).toEqual({ min: null, max: 2_000_000 });
+  });
+});
+
+describe('toAgentBrief', () => {
+  it('keeps the full bedroom range and the budget qualifier, unlike toContractRequirements', () => {
+    const state: RequirementsState = {
+      locations: sourced(['Jumeirah Village Circle']),
+      bedrooms: sourced({ min: 0, max: 1 }),
+      budget: sourced({ minAed: null, maxAed: 900_000, qualifier: 'under' }),
+      propertyType: null,
+      transaction: null,
+      preferences: [],
+    };
+    const brief = toAgentBrief(state);
+    expect(brief.bedroomsRange).toEqual({ min: 0, max: 1 });
+    expect(brief.budget).toEqual({ minAed: null, maxAed: 900_000, qualifier: 'under', effectiveMaxAed: 900_000 });
+  });
+
+  it('computes effectiveMaxAed for "around" instead of leaving it for the agent to derive', () => {
+    const state: RequirementsState = {
+      locations: null,
+      bedrooms: null,
+      budget: sourced({ minAed: null, maxAed: 2_000_000, qualifier: 'around' }),
+      propertyType: null,
+      transaction: null,
+      preferences: [],
+    };
+    expect(toAgentBrief(state).budget).toEqual({ minAed: null, maxAed: 2_000_000, qualifier: 'around', effectiveMaxAed: 2_100_000 });
+  });
+
+  it('a null budget stays null, not an object with null fields', () => {
+    const state: RequirementsState = { locations: null, bedrooms: null, budget: null, propertyType: null, transaction: null, preferences: [] };
+    expect(toAgentBrief(state).budget).toBeNull();
   });
 });
