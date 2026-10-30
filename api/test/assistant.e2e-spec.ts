@@ -271,6 +271,91 @@ describe('Assistant routes (against the test database, mocked model)', () => {
     });
   });
 
+  describe('the follow-up action is decided by the route, not by the model', () => {
+    /** Scripts a "search"-routing extraction for Karim, citing real quotes from his seed message. */
+    function karimSearchExtraction(messageId: string) {
+      return minimalExtraction({
+        intent: 'requirements',
+        locations: { value: ['Dubai Marina'], evidence: { sourceId: messageId, quote: 'Dubai Marina' }, status: 'stated' },
+        bedrooms: {
+          value: { min: 2, max: 2 },
+          evidence: { sourceId: messageId, quote: '2-bedroom' },
+          status: 'stated',
+        },
+      });
+    }
+
+    async function karimInboundMessageId(token: string): Promise<string> {
+      const lead = await request(app.getHttpServer()).get(`/leads/${KARIM}`).set('Authorization', `Bearer ${token}`).expect(200);
+      return lead.body.messages.find((m: { direction: string }) => m.direction === 'inbound').id;
+    }
+
+    it('still proposes one action on the search route when the model returns followUpTask: null', async () => {
+      const token = await login('sara@marinabay.test');
+      const messageId = await karimInboundMessageId(token);
+
+      scripted.push(
+        textResult(karimSearchExtraction(messageId)),
+        textResult({ recommendations: [], summary: 'Nothing fits.', reply: 'Nothing fits.', followUpTask: null }),
+      );
+
+      const response = await request(app.getHttpServer())
+        .post(`/leads/${KARIM}/assistant/runs`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ messageId })
+        .expect(201);
+
+      expect(response.body.status).toBe('completed');
+      // Proves the search route was actually taken: the summary is the agent's, not a template's,
+      // so the action below came from the route decision rather than a template's followUpTask.
+      expect(response.body.summary).toBe('Nothing fits.');
+      expect(response.body.requirements.locations).toEqual(['Dubai Marina']);
+      expect(response.body.proposedActions).toHaveLength(1);
+      expect(response.body.proposedActions[0].task.title).toBeTruthy();
+    });
+
+    it('uses the model wording for the action when it supplies one', async () => {
+      const token = await login('sara@marinabay.test');
+      const messageId = await karimInboundMessageId(token);
+
+      scripted.push(
+        textResult(karimSearchExtraction(messageId)),
+        textResult({
+          recommendations: [],
+          summary: 'Nothing fits.',
+          reply: 'Nothing fits.',
+          followUpTask: { title: 'Call Karim about Marina stock', notes: 'He wants a 2-bed.' },
+        }),
+      );
+
+      const response = await request(app.getHttpServer())
+        .post(`/leads/${KARIM}/assistant/runs`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ messageId })
+        .expect(201);
+
+      expect(response.body.proposedActions).toHaveLength(1);
+      expect(response.body.proposedActions[0].task).toMatchObject({
+        title: 'Call Karim about Marina stock',
+        notes: 'He wants a 2-bed.',
+      });
+    });
+
+    it('proposes nothing when the lead closed the conversation', async () => {
+      const token = await login('sara@marinabay.test');
+      scripted.push(textResult(minimalExtraction({ closed: true })));
+
+      const response = await request(app.getHttpServer())
+        .post(`/leads/${HASSAN}/assistant/runs`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(201);
+
+      expect(response.body.status).toBe('completed');
+      expect(response.body.proposedActions).toEqual([]);
+    });
+  });
+
   describe('failure handling', () => {
     it('a model that never produces a valid extraction yields the literal failed-run shape', async () => {
       scripted.push(textResult({ not: 'valid' }), textResult({ still: 'not valid' }));

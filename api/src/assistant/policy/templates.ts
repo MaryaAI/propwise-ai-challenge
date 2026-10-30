@@ -4,6 +4,15 @@ export interface TemplateOutput {
   followUpTask: { title: string; notes: string | null } | null;
 }
 
+/**
+ * The fallback title for a route that must propose a follow-up (architecture section 2) when the
+ * model supplied no `followUpTask` of its own. Whether an action exists is a code decision; the
+ * model only ever contributes the wording.
+ */
+export function followUpTitle(leadName: string): string {
+  return `Follow up with ${leadName}`;
+}
+
 export function rentTemplate(leadName: string): TemplateOutput {
   return {
     summary: `${leadName} is looking to rent, but our listings are for sale only.`,

@@ -11,7 +11,7 @@ import { computeDueAt } from './policy/follow-up-date';
 import { bedroomsRange, mergeRequirements, toAgentBrief, toContractRequirements } from './policy/merge';
 import { filterRecommendations, grossYield, selectRecommendations } from './policy/guardrails';
 import { route } from './policy/router';
-import { clarifyTemplate, closedTemplate, rentTemplate, TemplateOutput } from './policy/templates';
+import { clarifyTemplate, closedTemplate, followUpTitle, rentTemplate, TemplateOutput } from './policy/templates';
 import { Candidate, ContractRequirements, PropertyFacts, RequirementsState, Route } from './types';
 
 const RUN_TIMEOUT_MS = 100_000;
@@ -33,6 +33,16 @@ interface RecommendationSnapshot {
 
 function emptyContractRequirements(): ContractRequirements {
   return { locations: [], bedrooms: null, budgetAed: { min: null, max: null }, propertyType: null, intent: 'unknown', preferences: [] };
+}
+
+/**
+ * Which routes propose a follow-up task, per architecture section 2's route table. `closed` needs
+ * no follow-up, and `property_question` carries the parent's pending action forward rather than
+ * proposing a second one (an action is reachable only under its own run's URL, so duplicating it
+ * would let the same follow-up be approved twice into two separate tasks).
+ */
+function proposesFollowUp(chosenRoute: Route): boolean {
+  return chosenRoute !== 'closed' && chosenRoute !== 'property_question';
 }
 
 function collectSeenPropertyIds(entries: ReturnType<Trace['toContract']>): Set<string> {
@@ -160,12 +170,24 @@ export class AssistantService {
 
     const { dueAt, needsClarification } = computeDueAt(extraction.followUp, context.message.sentAt, agent.timezone);
 
+    // Whether a follow-up is proposed is decided here, by route (architecture section 2), never by
+    // the model: `followUpTask` is an optional field the model may leave null, so letting it decide
+    // made the action count a coin flip between runs. The model only contributes the wording.
+    const proposedAction = proposesFollowUp(chosenRoute)
+      ? {
+          title: followUpTask?.title ?? followUpTitle(context.lead.name),
+          notes: followUpTask?.notes ?? null,
+          dueAt,
+          needsClarification,
+        }
+      : null;
+
     return {
       requirements,
       recommendations,
       summary,
       reply,
-      proposedAction: followUpTask ? { title: followUpTask.title, notes: followUpTask.notes, dueAt, needsClarification } : null,
+      proposedAction,
       trace,
       extraction: { bedroomsRange: bedroomsRange(merged), rejected: extraction.rejected, propertyRefs: extraction.propertyRefs },
     };
