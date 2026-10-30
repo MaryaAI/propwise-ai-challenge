@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { AuthAgent, CurrentAgent } from '../auth/decorators';
 import { ActionsService } from './actions.service';
 import { CreateRunDto } from './assistant.dto';
@@ -35,6 +35,7 @@ export class AssistantController {
   }
 
   @Post('leads/:leadId/assistant/runs/:runId/actions/:actionId/approve')
+  @HttpCode(200)
   approve(
     @CurrentAgent() agent: AuthAgent,
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -45,6 +46,7 @@ export class AssistantController {
   }
 
   @Post('leads/:leadId/assistant/runs/:runId/actions/:actionId/reject')
+  @HttpCode(200)
   reject(
     @CurrentAgent() agent: AuthAgent,
     @Param('leadId', ParseUUIDPipe) leadId: string,

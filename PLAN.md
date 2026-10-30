@@ -39,19 +39,19 @@ Done when: a `curl` against Karim's lead returns the expected result in under a 
 - [x] `extraction.schema.ts` + `extractor.ts` + extraction prompt, with one retry on malformed output — 3b
 - [x] `agent-runner.ts` + agent prompt + `FinalSchema` — 3b
 - [x] `templates.ts` for the no-agent routes — 3b
-- [ ] `assistant.service.ts` (stages 1→7, 100s `AbortSignal`) + `assistant.mapper.ts`
-- [ ] Temporary controller for `POST /runs` only; manual `curl` against Karim, Lina, Alex, Priya, Hassan, compared against the expected tables
-- [ ] Commit
+- [x] `assistant.service.ts` (stages 1→7, 100s `AbortSignal`) + `assistant.mapper.ts` — 3c, mocked e2e only; real `curl` against Karim/Lina/Alex/Priya/Hassan still pending (see note below)
+- [ ] Manual `curl` against Karim, Lina, Alex, Priya, Hassan, compared against the expected tables — **deferred**: a short follow-up round, spends real API budget
+- [x] Commit
 
 ## Phase 4 — Routes (30 min)
 
 Done when: every row of the error matrix (architecture section 6), plus double-approve, passes `test:e2e`.
 
-- [ ] `assistant.dto.ts`: `CreateRunDto`, `ChatMessageDto`, `ListRunsQuery`
-- [ ] Full controller: the four contract routes + `GET /runs`, all with `ParseUUIDPipe`
-- [ ] `actions.service.ts` per architecture section 7 (pessimistic lock, `UNIQUE(task_id)`)
-- [ ] `test/assistant.e2e-spec.ts` against a mocked model: every error-matrix row; double approve; concurrent approve (`Promise.all`) still one task; a run changes no tasks and no `lead.updatedAt`; the literal failed-run shape
-- [ ] `pnpm -C api test:e2e` (existing + new) green, then commit
+- [x] `assistant.dto.ts`: `CreateRunDto` (`ChatMessageDto`/`ListRunsQuery` are chat/Phase 6, not yet)
+- [x] Full controller: the four contract routes, all with `ParseUUIDPipe` (`GET /runs` list is chat/Phase 6, not yet)
+- [x] `actions.service.ts` per architecture section 7 (pessimistic lock, `UNIQUE(task_id)`)
+- [x] `test/assistant.e2e-spec.ts` against a mocked model: every error-matrix row; double approve; concurrent approve (`Promise.all`) still one task; a run changes no tasks and no `lead.updatedAt`; the literal failed-run shape
+- [x] `pnpm -C api test:e2e` (existing + new) green, then commit — 48/48, run twice, no file-order dependency
 
 ## Phase 5 — Evals (35 min)
 
@@ -123,3 +123,6 @@ Done when: the delivery checklist (TASK.md's "When time is up") is complete.
   - Tools stay non-strict. No tool sets `strict: true`, so the single `SearchFilters` zod schema — with its full numeric/length/array constraints — is used directly as `search_properties`'s `inputSchema`. Confirmed from `@ai-sdk/anthropic`'s own source that its schema-sanitizing transform (`sanitizeJsonSchema`) runs only on the `Output.object`/structured-output path, never on tool schemas. Revisit with a `SearchFiltersForModel` only if a future phase turns `strict: true` on for a tool.
   - For Phase 3b: `Output.object` on a model with native structured-output support goes through Anthropic's `output_config.format` path (`structuredOutputMode: 'auto'` resolves to native `'outputFormat'` for supported models, including `claude-sonnet-5-5`). That path runs every schema through `sanitizeJsonSchema`, which silently drops `minLength`/`maxLength`/`minimum`/`maximum`/`multipleOf`/`pattern`/array-constraints-beyond-1 and appends a plain-language description of each dropped constraint to that field's `description` — it does not error. So extraction/final-output schemas can keep `.min()`/`.max()`/`.regex()` without Anthropic rejecting the request, but every length/range/pattern rule must still be enforced in code after parsing, since the model is no longer mechanically bound to a dropped constraint.
 - **A10 — no separate truncation step needed (Phase 3b correction):** A9 assumed a dropped request-side constraint meant *our own code* had to re-enforce it after parsing (hence a planned `sanitizeFinalOutput` that truncates oversized fields). Reading `ai/src/generate-text/output.ts`'s `parseCompleteOutput` during implementation showed this was already covered: it runs `safeValidateTypes` against the *original, unsanitized* zod schema on every response, so a value violating `.max()`/`.regex()` fails validation and throws `NoObjectGeneratedError` — it can never reach application code as a parsed-but-oversized object. Confirmed empirically in `agent-runner.spec.ts` ("a final object violating a schema length cap is rejected by validation, not silently truncated"). `AgentRunner`/`Extractor` therefore have no truncation step; `NoObjectGeneratedError`/`AgentFailedError` is the correct and only outcome for an out-of-bound response. A9's underlying point stands for the *evidence/semantic* checks (quote-exists, area-in-list, amount-matches-evidence) — those truly aren't expressible in zod and are where `extractor.ts`'s validation step earns its keep — just not for the length caps themselves.
+- **A11 — two real bugs found finishing Phase 3/4:**
+  - `AgentRunner`'s 3b catch block discarded the trace on every failure path, even though architecture section 3.8 explicitly requires trace/steps to survive a failed run for diagnosis. Fixed: `AgentFailedError` now carries the trace, and any other rethrown error (`ToolInfraError`, an abort) gets `.trace` attached generically before leaving `AgentRunner.run()`, so `assistant.service.ts`'s failure path can still persist whatever tool calls happened before the failure.
+  - `AssistantController`'s `approve`/`reject` routes returned `201 Created` instead of the contract's `200` — Nest's `@Post()` defaults to 201 unless told otherwise. Caught immediately by the new e2e spec (4 failing assertions, all `expected 200, got 201`); fixed with `@HttpCode(200)` on both routes.
