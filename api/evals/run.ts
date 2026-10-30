@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createApp, EvalCase, login, resetTestDatabase } from './harness';
+import { createApp, EvalCase, login, resetTestDatabase, startRecording } from './harness';
 import { case1aExtractionKarim } from './cases/1a-extraction-karim';
 import { case1bExtractionFatima } from './cases/1b-extraction-fatima';
 import { case2MatchingKarim } from './cases/2-matching-karim';
@@ -87,16 +87,19 @@ async function main(): Promise<void> {
   for (const evalCase of cases) {
     const startedAt = Date.now();
     console.log(`Running ${evalCase.name}...`);
+    // A fresh recorder per case, so a trace file can never contain another case's runs.
+    const recorder = startRecording();
+    const traceFile = join(tracesDir, `${evalCase.name}.json`);
     try {
       const { trace } = await evalCase.run(ctx);
-      writeFileSync(join(tracesDir, `${evalCase.name}.json`), JSON.stringify(trace, null, 2));
+      writeFileSync(traceFile, JSON.stringify({ trace, runs: recorder.runs }, null, 2));
       const durationMs = Date.now() - startedAt;
       results.push({ name: evalCase.name, category: evalCase.category, passed: true, durationMs });
       console.log(`  PASS (${durationMs}ms)`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const durationMs = Date.now() - startedAt;
-      writeFileSync(join(tracesDir, `${evalCase.name}.json`), JSON.stringify({ error: message }, null, 2));
+      writeFileSync(traceFile, JSON.stringify({ error: message, runs: recorder.runs }, null, 2));
       results.push({ name: evalCase.name, category: evalCase.category, passed: false, error: message, durationMs });
       console.log(`  FAIL: ${message}`);
     }

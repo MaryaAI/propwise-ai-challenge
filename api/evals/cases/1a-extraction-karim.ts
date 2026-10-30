@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
-import { createRun, EvalCase, stableId } from '../harness';
+import { assertCompleted, createRun, EvalCase, seedRequirementsMessageId, stableId } from '../harness';
 
 export const case1aExtractionKarim: EvalCase = {
   name: '1a-extraction-karim',
   category: 'extraction',
   async run({ app, saraToken }) {
     const leadId = stableId('lead', 'karim');
-    const run = await createRun(app, saraToken, leadId);
+    const messageId = await seedRequirementsMessageId(app, saraToken, leadId);
+    const run = await createRun(app, saraToken, leadId, messageId);
 
-    assert.strictEqual(run.status, 'completed');
+    assertCompleted(run);
     assert.deepEqual(run.requirements.locations, ['Dubai Marina']);
     assert.strictEqual(run.requirements.bedrooms, 2);
     assert.strictEqual(run.requirements.budgetAed.max, 2_000_000);

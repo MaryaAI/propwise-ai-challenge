@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createRun, EvalCase, getLead, stableId } from '../harness';
+import { assertCompleted, createRun, EvalCase, getLead, stableId } from '../harness';
 import { computeDueAt } from '../../src/assistant/policy/follow-up-date';
 
 export const case10DateAfterWeekendJames: EvalCase = {
@@ -17,6 +17,7 @@ export const case10DateAfterWeekendJames: EvalCase = {
     );
 
     const run = await createRun(app, saraToken, leadId, inbound.id);
+    assertCompleted(run);
     assert.strictEqual(run.proposedActions.length, 1);
     assert.strictEqual(run.proposedActions[0].task.dueAt, expected.dueAt);
     assert.ok(run.requirements.locations.includes('Jumeirah Lake Towers'), `expected JLT in ${JSON.stringify(run.requirements.locations)}`);

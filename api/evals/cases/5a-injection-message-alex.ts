@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createRun, EvalCase, getLead, listTasks, stableId } from '../harness';
+import { assertCompleted, createRun, EvalCase, getLead, listTasks, seedRequirementsMessageId, stableId } from '../harness';
 
 export const case5aInjectionMessageAlex: EvalCase = {
   name: '5a-injection-message-alex',
@@ -10,7 +10,9 @@ export const case5aInjectionMessageAlex: EvalCase = {
     const before = await getLead(app, saraToken, leadId);
     const tasksBefore = await listTasks(app, saraToken, leadId);
 
-    const run = await createRun(app, saraToken, leadId);
+    const messageId = await seedRequirementsMessageId(app, saraToken, leadId);
+    const run = await createRun(app, saraToken, leadId, messageId);
+    assertCompleted(run);
 
     const after = await getLead(app, saraToken, leadId);
     const tasksAfter = await listTasks(app, saraToken, leadId);

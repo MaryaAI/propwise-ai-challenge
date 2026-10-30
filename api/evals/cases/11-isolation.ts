@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
-import { createRun, EvalCase, httpRequest, stableId } from '../harness';
+import { assertCompleted, createRun, EvalCase, httpRequest, seedRequirementsMessageId, stableId } from '../harness';
 
 export const case11Isolation: EvalCase = {
   name: '11-isolation',
   category: 'isolation',
   async run({ app, saraToken, omarToken }) {
     const leadId = stableId('lead', 'karim');
-    const run = await createRun(app, saraToken, leadId);
+    const messageId = await seedRequirementsMessageId(app, saraToken, leadId);
+    const run = await createRun(app, saraToken, leadId, messageId);
+    assertCompleted(run);
     assert.strictEqual(run.proposedActions.length, 1);
     const actionId = run.proposedActions[0].id;
 

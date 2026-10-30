@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { addMessage, createRun, EvalCase, stableId } from '../harness';
+import { addMessage, assertCompleted, createRun, EvalCase, stableId } from '../harness';
 
 export const case4AmbiguousDate: EvalCase = {
   name: '4-ambiguous-date',
@@ -13,6 +13,7 @@ export const case4AmbiguousDate: EvalCase = {
     });
 
     const run = await createRun(app, saraToken, leadId, message.id);
+    assertCompleted(run);
 
     assert.strictEqual(run.proposedActions.length, 1, 'expected exactly one proposed action');
     const action = run.proposedActions[0];

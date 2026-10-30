@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createRun, EvalCase, getLead, stableId } from '../harness';
+import { assertCompleted, createRun, EvalCase, getLead, stableId } from '../harness';
 import { computeDueAt } from '../../src/assistant/policy/follow-up-date';
 
 /**
@@ -18,6 +18,7 @@ export const case9DateTomorrowKarim: EvalCase = {
     const expected = computeDueAt({ kind: 'tomorrow', weekday: null, days: null, time: null, raw: null }, new Date(inbound.sentAt), 'Asia/Dubai');
 
     const run = await createRun(app, saraToken, leadId, inbound.id);
+    assertCompleted(run);
     assert.strictEqual(run.proposedActions.length, 1);
     assert.strictEqual(run.proposedActions[0].task.dueAt, expected.dueAt);
 

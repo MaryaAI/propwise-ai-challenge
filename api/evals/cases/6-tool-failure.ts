@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { EvalCase, httpRequest, stableId } from '../harness';
+import { assertFailed, EvalCase, httpRequest, stableId } from '../harness';
 import { PropertyQuery } from '../../src/assistant/agent/property-query';
 
 export const case6ToolFailure: EvalCase = {
@@ -26,8 +26,7 @@ export const case6ToolFailure: EvalCase = {
       assert.strictEqual(response.status, 201);
 
       const run = response.body;
-      assert.strictEqual(run.status, 'failed');
-      assert.ok(run.error, 'expected a non-empty error message');
+      assertFailed(run);
       assert.deepEqual(run.recommendations, []);
       assert.deepEqual(run.proposedActions, []);
 

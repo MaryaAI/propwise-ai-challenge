@@ -39,6 +39,41 @@ export interface EvalContext {
   createApp: typeof createApp;
 }
 
+/**
+ * Every run payload a case touched, so a failing case's trace file shows what the API actually
+ * returned instead of only the assertion text. `run.ts` starts a fresh recorder before each case,
+ * so one case can never pick up another's runs.
+ */
+export interface RunRecorder {
+  runs: unknown[];
+}
+
+let currentRecorder: RunRecorder | null = null;
+
+export function startRecording(): RunRecorder {
+  currentRecorder = { runs: [] };
+  return currentRecorder;
+}
+
+function record(label: string, payload: unknown): void {
+  currentRecorder?.runs.push({ label, payload });
+}
+
+/** Asserts a run completed, surfacing the API's own error text when it did not. */
+export function assertCompleted(run: { status: string; error?: string | null; summary?: string; requirements?: unknown }): void {
+  assert.strictEqual(
+    run.status,
+    'completed',
+    `expected a completed run, got ${run.status}: ${JSON.stringify({ error: run.error, summary: run.summary, requirements: run.requirements })}`,
+  );
+}
+
+/** The mirror of `assertCompleted`, for the one case that deliberately expects a failed run. */
+export function assertFailed(run: { status: string; error?: string | null }): void {
+  assert.strictEqual(run.status, 'failed', `expected a failed run, got ${run.status}`);
+  assert.ok(run.error, 'a failed run must carry an error');
+}
+
 export interface EvalCase {
   name: string;
   category: string;
@@ -88,14 +123,30 @@ export async function addMessage(
 
 export async function createRun(app: INestApplication<App>, token: string, leadId: string, messageId?: string) {
   const response = await httpRequest(app, token, 'post', `/leads/${leadId}/assistant/runs`, messageId ? { messageId } : {});
+  // Record before asserting: a non-201 body is the most interesting one to keep.
+  record(`createRun(${leadId})`, response.body);
   assert.strictEqual(response.status, 201, `createRun failed: ${JSON.stringify(response.body)}`);
   return response.body;
 }
 
 export async function getRun(app: INestApplication<App>, token: string, leadId: string, runId: string) {
   const response = await httpRequest(app, token, 'get', `/leads/${leadId}/assistant/runs/${runId}`);
+  record(`getRun(${runId})`, response.body);
   assert.strictEqual(response.status, 200, `getRun failed: ${JSON.stringify(response.body)}`);
   return response.body;
+}
+
+/**
+ * The lead's oldest inbound seed message. Cases pin this explicitly rather than relying on the
+ * "latest inbound" default, which case 4 changes for Karim by appending a message mid-suite.
+ */
+export async function seedRequirementsMessageId(app: INestApplication<App>, token: string, leadId: string): Promise<string> {
+  const lead = await getLead(app, token, leadId);
+  const inbound = (lead.messages as { id: string; direction: string; sentAt: string }[])
+    .filter((m) => m.direction === 'inbound')
+    .sort((a, b) => (a.sentAt === b.sentAt ? a.id.localeCompare(b.id) : a.sentAt.localeCompare(b.sentAt)));
+  assert.ok(inbound.length > 0, `lead ${leadId} has no inbound message`);
+  return inbound[0].id;
 }
 
 export async function approve(app: INestApplication<App>, token: string, leadId: string, runId: string, actionId: string) {

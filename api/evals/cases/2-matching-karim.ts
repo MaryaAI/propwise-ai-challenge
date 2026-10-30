@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createRun, EvalCase, stableId } from '../harness';
+import { assertCompleted, createRun, EvalCase, seedRequirementsMessageId, stableId } from '../harness';
 
 const ALLOWED = new Set(['MBR-1001', 'MBR-1007', 'MBR-1002', 'MBR-1022'].map((ref) => stableId('property', ref)));
 
@@ -8,8 +8,10 @@ export const case2MatchingKarim: EvalCase = {
   category: 'matching',
   async run({ app, saraToken }) {
     const leadId = stableId('lead', 'karim');
-    const run = await createRun(app, saraToken, leadId);
+    const messageId = await seedRequirementsMessageId(app, saraToken, leadId);
+    const run = await createRun(app, saraToken, leadId, messageId);
 
+    assertCompleted(run);
     assert.ok(run.recommendations.length > 0, 'expected at least one recommendation for Karim');
 
     for (const rec of run.recommendations) {

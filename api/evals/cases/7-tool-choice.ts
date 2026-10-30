@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createRun, EvalCase, stableId } from '../harness';
+import { assertCompleted, createRun, EvalCase, seedRequirementsMessageId, stableId } from '../harness';
 
 /**
  * Not in architecture's table -- its case 7 ("choosing the right tool") is chat-only and deferred
@@ -12,7 +12,9 @@ export const case7ToolChoice: EvalCase = {
   category: 'tool-choice',
   async run({ app, saraToken }) {
     const leadId = stableId('lead', 'karim');
-    const run = await createRun(app, saraToken, leadId);
+    const messageId = await seedRequirementsMessageId(app, saraToken, leadId);
+    const run = await createRun(app, saraToken, leadId, messageId);
+    assertCompleted(run);
 
     const tools = (run.trace as { tool: string }[]).map((entry) => entry.tool);
     assert.ok(tools.includes('search_properties'), 'expected search_properties to be called');
