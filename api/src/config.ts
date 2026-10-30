@@ -13,4 +13,6 @@ export const config = {
   port: () => Number(process.env.PORT ?? 3001),
   databaseUrl: () => required('DATABASE_URL'),
   jwtSecret: () => required('JWT_SECRET'),
+  anthropicApiKey: () => required('ANTHROPIC_API_KEY'),
+  assistantModel: () => process.env.ASSISTANT_MODEL ?? 'claude-sonnet-5-5',
 };

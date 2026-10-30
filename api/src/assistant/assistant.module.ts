@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { assistantModelFactoryProvider } from './model';
 
-@Module({})
+@Module({
+  providers: [assistantModelFactoryProvider],
+})
 export class AssistantModule {}
