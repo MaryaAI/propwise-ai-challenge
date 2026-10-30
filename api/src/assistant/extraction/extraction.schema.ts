@@ -5,7 +5,9 @@ export const EvidenceSchema = z.object({ sourceId: z.string(), quote: z.string()
 function Field<T extends z.ZodTypeAny>(value: T) {
   return z.object({
     value: value.nullable(),
-    evidence: EvidenceSchema.nullable(),
+    // Always present (never null) to stay under Anthropic's union-type-count limit for structured
+    // output -- an empty sourceId/quote means "no evidence", used whenever status isn't "stated".
+    evidence: EvidenceSchema,
     status: z.enum(['stated', 'missing', 'ambiguous']),
   });
 }

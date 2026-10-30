@@ -23,7 +23,7 @@ function textResult(payload: unknown) {
   };
 }
 
-const MISSING_FIELD = { value: null, evidence: null, status: 'missing' as const };
+const MISSING_FIELD = { value: null, evidence: { sourceId: '', quote: '' }, status: 'missing' as const };
 
 function minimalExtraction(overrides: Partial<Record<string, unknown>> = {}) {
   return {

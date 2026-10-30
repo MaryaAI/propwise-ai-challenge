@@ -22,7 +22,7 @@ export interface ExtractionResult {
   rejected: RejectedField[];
 }
 
-type ExtractionField<T> = { value: T | null; evidence: Evidence | null; status: 'stated' | 'missing' | 'ambiguous' };
+type ExtractionField<T> = { value: T | null; evidence: Evidence; status: 'stated' | 'missing' | 'ambiguous' };
 
 function sourced<T>(value: T, evidence: Evidence): Sourced<T> {
   return { value, source: evidence.sourceId, evidence };
@@ -73,7 +73,7 @@ export class Extractor {
     const areaByLower = new Map(input.areas.map((a) => [a.toLowerCase(), a]));
 
     const hasValidEvidence = (field: ExtractionField<unknown>): boolean => {
-      if (field.status !== 'stated' || field.evidence === null) return false;
+      if (field.status !== 'stated') return false;
       const source = sourceById.get(field.evidence.sourceId);
       if (!source) return false;
       return quoteExists(field.evidence.quote, source.body);
@@ -88,14 +88,14 @@ export class Extractor {
         if (match) canonical.push(match);
         else rejected.push({ field: 'locations', reason: `"${loc}" is not one of this agency's areas` });
       }
-      if (canonical.length > 0) update.locations = sourced(canonical, raw.locations.evidence!);
+      if (canonical.length > 0) update.locations = sourced(canonical, raw.locations.evidence);
     } else if (raw.locations.status === 'stated') {
       rejected.push({ field: 'locations', reason: 'evidence quote not found in the cited message' });
     }
 
     if (hasValidEvidence(raw.bedrooms) && raw.bedrooms.value) {
       const { min, max } = raw.bedrooms.value;
-      if (min <= max) update.bedrooms = sourced({ min, max }, raw.bedrooms.evidence!);
+      if (min <= max) update.bedrooms = sourced({ min, max }, raw.bedrooms.evidence);
       else rejected.push({ field: 'bedrooms', reason: `min (${min}) is greater than max (${max})` });
     } else if (raw.bedrooms.status === 'stated') {
       rejected.push({ field: 'bedrooms', reason: 'evidence quote not found in the cited message' });
@@ -103,10 +103,10 @@ export class Extractor {
 
     if (hasValidEvidence(raw.budget) && raw.budget.value) {
       const { minAed, maxAed, qualifier } = raw.budget.value;
-      const quote = raw.budget.evidence!.quote;
+      const quote = raw.budget.evidence.quote;
       const claimed = maxAed ?? minAed;
       if (claimed === null || amountMatchesEvidence(claimed, quote)) {
-        update.budget = sourced({ minAed, maxAed, qualifier }, raw.budget.evidence!);
+        update.budget = sourced({ minAed, maxAed, qualifier }, raw.budget.evidence);
       } else {
         rejected.push({ field: 'budget', reason: `claimed amount does not match the evidence quote "${quote}"` });
       }
@@ -115,13 +115,13 @@ export class Extractor {
     }
 
     if (hasValidEvidence(raw.propertyType) && raw.propertyType.value) {
-      update.propertyType = sourced(raw.propertyType.value, raw.propertyType.evidence!);
+      update.propertyType = sourced(raw.propertyType.value, raw.propertyType.evidence);
     } else if (raw.propertyType.status === 'stated') {
       rejected.push({ field: 'propertyType', reason: 'evidence quote not found in the cited message' });
     }
 
     if (hasValidEvidence(raw.transaction) && raw.transaction.value) {
-      update.transaction = sourced(raw.transaction.value, raw.transaction.evidence!);
+      update.transaction = sourced(raw.transaction.value, raw.transaction.evidence);
     } else if (raw.transaction.status === 'stated') {
       rejected.push({ field: 'transaction', reason: 'evidence quote not found in the cited message' });
     }
@@ -140,7 +140,7 @@ export class Extractor {
     let followUp: FollowUpTiming | null = null;
     if (hasValidEvidence(raw.followUp) && raw.followUp.value) {
       const { kind, weekday, days, time } = raw.followUp.value;
-      followUp = { kind, weekday, days, time, raw: raw.followUp.evidence!.quote };
+      followUp = { kind, weekday, days, time, raw: raw.followUp.evidence.quote };
     } else if (raw.followUp.status === 'stated') {
       rejected.push({ field: 'followUp', reason: 'evidence quote not found in the cited message' });
     }

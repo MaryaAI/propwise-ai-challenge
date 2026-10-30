@@ -18,7 +18,7 @@
     "db:seed": "tsx src/db/seed-cli.ts",
     "db:reset": "tsx src/db/reset.ts",
     "db:migration:create": "tsx src/db/create-migration.ts",
-    "eval": "tsx evals/run.ts"
+    "eval": "ts-node --transpile-only evals/run.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.131",
@@ -51,6 +51,7 @@
     "jest": "29.7.0",
     "supertest": "7.3.1",
     "ts-jest": "29.4.15",
+    "ts-node": "10.9.2",
     "tsx": "4.23.15",
     "typescript": "5.9.3"
   },

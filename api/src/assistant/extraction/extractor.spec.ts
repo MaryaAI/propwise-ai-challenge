@@ -45,7 +45,7 @@ function karimExtraction(): Extraction {
       status: 'stated',
     },
     propertyType: { value: 'apartment', evidence: { sourceId: 'msg-1', quote: 'apartment' }, status: 'stated' },
-    transaction: { value: null, evidence: null, status: 'missing' },
+    transaction: { value: null, evidence: { sourceId: '', quote: '' }, status: 'missing' },
     preferences: [{ text: 'good rental yield', evidence: { sourceId: 'msg-1', quote: 'good rental yield' } }],
     followUp: {
       value: { kind: 'tomorrow', weekday: null, days: null, time: null },
