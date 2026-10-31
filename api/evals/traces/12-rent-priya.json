@@ -1,0 +1,112 @@
+{
+  "trace": [],
+  "runs": [
+    {
+      "label": "createRun(4e9649a2-b0e3-5342-a303-87e4b5eba73f)",
+      "payload": {
+        "id": "b217daf3-4d8a-4b48-8e41-d3e6b83c6fa1",
+        "leadId": "4e9649a2-b0e3-5342-a303-87e4b5eba73f",
+        "messageId": "528b3bb0-1b9c-5a38-8d4a-ba3cc7c3968d",
+        "status": "completed",
+        "requirements": {
+          "locations": [
+            "Business Bay"
+          ],
+          "bedrooms": 2,
+          "budgetAed": {
+            "min": null,
+            "max": 120000
+          },
+          "propertyType": null,
+          "intent": "rent",
+          "preferences": [
+            "Moving in next month"
+          ]
+        },
+        "recommendations": [],
+        "summary": "Priya Nair is looking to rent, but our listings are for sale only.",
+        "proposedActions": [
+          {
+            "id": "baf773b1-235c-4a33-b8f7-71186176a25b",
+            "type": "create_follow_up_task",
+            "status": "pending_approval",
+            "task": {
+              "title": "Follow up with Priya Nair about rental options",
+              "notes": null,
+              "dueAt": null
+            },
+            "needsClarification": "The lead did not say when to follow up."
+          }
+        ],
+        "trace": [],
+        "createdAt": "2026-10-31T03:36:55.069Z",
+        "parentRunId": null,
+        "trigger": "analysis",
+        "reply": "Thanks for reaching out! Just to let you know, our current listings are for sale only. I'll follow up with you about your options.",
+        "extraction": {
+          "bedroomsRange": {
+            "min": 2,
+            "max": 2
+          },
+          "rejected": [],
+          "propertyRefs": [],
+          "state": {
+            "locations": {
+              "value": [
+                "Business Bay"
+              ],
+              "source": "528b3bb0-1b9c-5a38-8d4a-ba3cc7c3968d",
+              "evidence": {
+                "sourceId": "528b3bb0-1b9c-5a38-8d4a-ba3cc7c3968d",
+                "quote": "Business Bay"
+              }
+            },
+            "bedrooms": {
+              "value": {
+                "min": 2,
+                "max": 2
+              },
+              "source": "528b3bb0-1b9c-5a38-8d4a-ba3cc7c3968d",
+              "evidence": {
+                "sourceId": "528b3bb0-1b9c-5a38-8d4a-ba3cc7c3968d",
+                "quote": "2-bed"
+              }
+            },
+            "budget": {
+              "value": {
+                "minAed": null,
+                "maxAed": 120000,
+                "qualifier": "around"
+              },
+              "source": "528b3bb0-1b9c-5a38-8d4a-ba3cc7c3968d",
+              "evidence": {
+                "sourceId": "528b3bb0-1b9c-5a38-8d4a-ba3cc7c3968d",
+                "quote": "about 120k a year"
+              }
+            },
+            "propertyType": null,
+            "transaction": {
+              "value": "rent",
+              "source": "528b3bb0-1b9c-5a38-8d4a-ba3cc7c3968d",
+              "evidence": {
+                "sourceId": "528b3bb0-1b9c-5a38-8d4a-ba3cc7c3968d",
+                "quote": "I'm looking to rent a 2-bed"
+              }
+            },
+            "preferences": [
+              {
+                "value": "Moving in next month",
+                "source": "528b3bb0-1b9c-5a38-8d4a-ba3cc7c3968d",
+                "evidence": {
+                  "sourceId": "528b3bb0-1b9c-5a38-8d4a-ba3cc7c3968d",
+                  "quote": "moving in next month"
+                }
+              }
+            ]
+          }
+        },
+        "steps": []
+      }
+    }
+  ]
+}
