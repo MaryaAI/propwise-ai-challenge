@@ -74,7 +74,8 @@ describe('Extractor', () => {
     expect(result.update.propertyType?.value).toBe('apartment');
     expect(result.update.transaction).toBeUndefined();
     expect(result.update.preferences).toEqual([{ value: 'good rental yield', source: 'msg-1', evidence: { sourceId: 'msg-1', quote: 'good rental yield' } }]);
-    expect(result.followUp).toEqual({ kind: 'tomorrow', weekday: null, days: null, time: null, raw: 'tomorrow' });
+    // `source` is the message the phrase was quoted from, so the date can be anchored on it.
+    expect(result.followUp).toEqual({ kind: 'tomorrow', weekday: null, days: null, time: null, raw: 'tomorrow', source: 'msg-1' });
     expect(result.propertyRefs).toEqual([]);
     expect(result.rejected).toEqual([]);
   });

@@ -6,6 +6,18 @@ export interface FollowUpTiming {
   days: number | null;
   time: string | null; // "HH:MM"
   raw: string | null;
+  /**
+   * The evidence sourceId the phrase was quoted from. This decides what "tomorrow" is relative to:
+   * a lead's message anchors on that message's sentAt (TASK.md), while the agent's own chat turn
+   * anchors on now. Optional so callers that only care about the classification can omit it.
+   */
+  source?: string;
+}
+
+/** A follow-up date already resolved in the agent's timezone, as persisted on a run. */
+export interface ResolvedTiming {
+  dueAt: string | null;
+  needsClarification: string | null;
 }
 
 export type BudgetQualifier = 'around' | 'under' | 'up_to' | 'exact' | 'from' | 'between';

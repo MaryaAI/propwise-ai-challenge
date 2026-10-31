@@ -5,7 +5,7 @@ import { LeadsService } from '../leads/leads.service';
 import { ConversationMessage } from './extraction/prompts';
 import { PropertyQuery } from './agent/property-query';
 import { parseRequirementsState } from './policy/merge';
-import { RequirementsState } from './types';
+import { RequirementsState, ResolvedTiming } from './types';
 
 const CONVERSATION_WINDOW = 10;
 
@@ -70,8 +70,11 @@ export interface ChatTurn {
 
 export interface ChatContext extends RunContext {
   parentRun: AssistantRun;
+  /** From the nearest completed ancestor, so a failed run in between does not erase it. */
   parentState: RequirementsState | null;
   parentRecommendations: RecommendationCarry[];
+  /** The follow-up date already resolved upstream, inherited when this turn states no timing. */
+  parentTiming: ResolvedTiming | null;
   /** Oldest first, capped at CHAT_HISTORY_TURNS. */
   history: ChatTurn[];
 }
@@ -83,6 +86,15 @@ export interface RecommendationCarry {
 }
 
 const CHAT_HISTORY_TURNS = 6;
+
+function parseResolvedTiming(value: unknown): ResolvedTiming | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { dueAt, needsClarification } = value as { dueAt?: unknown; needsClarification?: unknown };
+  const okDueAt = typeof dueAt === 'string' || dueAt === null;
+  const okReason = typeof needsClarification === 'string' || needsClarification === null;
+  if (!okDueAt || !okReason) return null;
+  return { dueAt: dueAt as string | null, needsClarification: needsClarification as string | null };
+}
 
 function parseRecommendationCarry(value: unknown): RecommendationCarry[] {
   if (!Array.isArray(value)) return [];
@@ -120,17 +132,38 @@ export async function loadChatContext(options: {
   const windowStart = Math.max(0, analysedIndex - CONVERSATION_WINDOW + 1);
   const conversation = allMessages.slice(windowStart, analysedIndex + 1).map(toConversationMessage);
 
-  const extraction = parentRun.extraction as { state?: unknown } | null;
-  const parentState = parseRequirementsState(extraction?.state);
-  const parentRecommendations = parseRecommendationCarry(parentRun.recommendations);
-
   // Walked explicitly rather than via populate: `parentRun` is a plain reference, so reading
   // `.agentMessage` off an uninitialised one yields undefined WITHOUT throwing -- a naive walk
   // would silently produce empty turns. Bounded to CHAT_HISTORY_TURNS hops, agency-scoped.
+  //
+  // The walk also recovers the last usable state/shortlist/timing. A failed run persists none of
+  // those (empty requirements, no `extraction.state`, recommendations []), so reading only the
+  // immediate parent would collapse the requirements after any transient model failure -- and
+  // because the guardrails skip the area/bedrooms/type checks when those fields are null, a
+  // retry on a failed run could then accept a listing that matches nothing the lead asked for.
   const history: ChatTurn[] = [];
+  let parentState: RequirementsState | null = null;
+  let parentRecommendations: RecommendationCarry[] = [];
+  let parentTiming: ResolvedTiming | null = null;
+  let recoveredFrom: AssistantRun | null = null;
+
   let cursor: AssistantRun | null = parentRun;
   for (let hop = 0; hop < CHAT_HISTORY_TURNS && cursor !== null; hop++) {
     if (cursor.agentMessage) history.push({ agentMessage: cursor.agentMessage, reply: cursor.reply });
+
+    if (recoveredFrom === null) {
+      const extraction = cursor.extraction as { state?: unknown; timing?: unknown } | null;
+      const state = parseRequirementsState(extraction?.state);
+      // A completed run with parseable state is authoritative, even if its state is empty (a
+      // "clarify" run legitimately has one). Only a failed or pre-`state` run falls through.
+      if (state !== null && cursor.status === 'completed') {
+        parentState = state;
+        parentRecommendations = parseRecommendationCarry(cursor.recommendations);
+        parentTiming = parseResolvedTiming(extraction?.timing);
+        recoveredFrom = cursor;
+      }
+    }
+
     const parentId: string | undefined = cursor.parentRun?.id;
     cursor = parentId ? await em.findOne(AssistantRun, { id: parentId, lead: lead.id, agency: agencyId }) : null;
   }
@@ -138,5 +171,5 @@ export async function loadChatContext(options: {
 
   const areas = await propertyQuery.distinctAreas(agencyId);
 
-  return { lead, message, conversation, areas, parentRun, parentState, parentRecommendations, history };
+  return { lead, message, conversation, areas, parentRun, parentState, parentRecommendations, parentTiming, history };
 }

@@ -35,7 +35,10 @@ export function clarifyTemplate(leadName: string): TemplateOutput {
  */
 export function changeFollowUpTemplate(leadName: string): TemplateOutput {
   return {
-    summary: `The follow-up with ${leadName} has been rescheduled.`,
+    // Not "has been rescheduled": nothing is written until the agent approves, and approving
+    // creates a new task rather than moving the old one. `summary` is a contract field ("what Sara
+    // should know"), so it must not claim a change that has not happened.
+    summary: `A follow-up with ${leadName} at the new time is waiting for your approval. The existing one is unchanged until you approve it.`,
     reply: `I have drafted a follow-up with ${leadName} for the new time. Approve it to add it to your tasks.`,
     followUpTask: { title: `Follow up with ${leadName}`, notes: null },
   };

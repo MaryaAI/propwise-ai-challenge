@@ -9,12 +9,13 @@ import { AgentFailedError, AgentRunner } from './agent/agent-runner';
 import { Trace } from './agent/tracing';
 import { ChatTurn, loadChatContext, loadRunContext, RecommendationCarry, RunContext } from './context';
 import { ExtractionFailedError, Extractor } from './extraction/extractor';
+import { AGENT_INSTRUCTION_SOURCE_ID, ConversationMessage } from './extraction/prompts';
 import { computeDueAt } from './policy/follow-up-date';
 import { bedroomsRange, emptyRequirementsState, mergeRequirements, toAgentBrief, toContractRequirements } from './policy/merge';
 import { filterRecommendations, grossYield, selectRecommendations } from './policy/guardrails';
 import { route } from './policy/router';
 import { changeFollowUpTemplate, clarifyTemplate, closedTemplate, followUpTitle, rentTemplate, TemplateOutput } from './policy/templates';
-import { Candidate, ContractRequirements, PropertyFacts, RequirementsState, Route } from './types';
+import { Candidate, ContractRequirements, FollowUpTiming, PropertyFacts, RequirementsState, ResolvedTiming, Route } from './types';
 
 const RUN_TIMEOUT_MS = 100_000;
 
@@ -157,6 +158,7 @@ export class AssistantService {
         instruction: input.content,
         parentState: context.parentState,
         parentRecommendations: context.parentRecommendations,
+        parentTiming: context.parentTiming,
         history: context.history,
       });
       persisted = await this.persist({ ...common, status: 'completed', ...outcome });
@@ -225,7 +227,13 @@ export class AssistantService {
     agent: Agent,
     context: RunContext,
     abortSignal: AbortSignal,
-    chat?: { instruction: string; parentState: RequirementsState | null; parentRecommendations: RecommendationCarry[]; history: ChatTurn[] },
+    chat?: {
+      instruction: string;
+      parentState: RequirementsState | null;
+      parentRecommendations: RecommendationCarry[];
+      parentTiming: ResolvedTiming | null;
+      history: ChatTurn[];
+    },
   ) {
     const trigger: AssistantRunTrigger = chat ? 'chat' : 'analysis';
     const parentState = chat?.parentState ?? null;
@@ -274,8 +282,12 @@ export class AssistantService {
       // architecture section 2: on `property_question` the recommendations are the PARENT's, carried
       // forward and re-verified -- not whatever the agent returned. Otherwise a "what's the service
       // charge?" turn, where returning [] is the sensible answer, would wipe them.
-      const candidates = chosenRoute === 'property_question' ? carried : agentResult.output.recommendations;
-      const snapshots = await this.buildRecommendationSnapshots(agencyId, candidates, merged, agentResult.trace, carried);
+      const carryForward = chosenRoute === 'property_question';
+      const candidates = carryForward ? carried : agentResult.output.recommendations;
+      // `carried` is handed over ONLY when it IS the candidate list. On the search route the
+      // candidates are the model's own picks, and pre-trusting the parent's ids there would let it
+      // re-list one with a fabricated price or yield in `reason` without any tool call this turn.
+      const snapshots = await this.buildRecommendationSnapshots(agencyId, candidates, merged, trace, carryForward ? carried : []);
       recommendations = snapshots.accepted;
       droppedRecommendations = snapshots.dropped;
     } else {
@@ -283,13 +295,26 @@ export class AssistantService {
       summary = template.summary;
       reply = template.reply;
       followUpTask = template.followUpTask;
+
+      // architecture section 2 gives `change_follow_up` the parent's recommendations, carried
+      // forward and re-verified. Leaving them at [] would report "nothing fits" for a lead whose
+      // listings are untouched, and -- since only the immediate parent is read -- would lose the
+      // shortlist for every later turn too. `rent`/`clarify`/`closed` are legitimately empty.
+      const carried = chat?.parentRecommendations ?? [];
+      if (chosenRoute === 'change_follow_up' && carried.length > 0) {
+        const snapshots = await this.buildRecommendationSnapshots(agencyId, carried, merged, trace, carried);
+        recommendations = snapshots.accepted;
+        droppedRecommendations = snapshots.dropped;
+      }
     }
 
-    // A chat turn is Sara speaking now, so its timing anchors on the turn itself. Anchoring on the
-    // parent's (older) lead message would resolve "move it to Tuesday" to a Tuesday already past.
-    // Via luxon rather than `new Date()`, per CLAUDE.md; computeDueAt converts into agent.timezone.
-    const timingAnchor = chat ? DateTime.utc().toJSDate() : context.message.sentAt;
-    const { dueAt, needsClarification } = computeDueAt(extraction.followUp, timingAnchor, agent.timezone);
+    const { dueAt, needsClarification } = this.resolveTiming({
+      followUp: extraction.followUp,
+      conversation: context.conversation,
+      analysedMessageSentAt: context.message.sentAt,
+      timezone: agent.timezone,
+      inherited: chat?.parentTiming ?? null,
+    });
 
     // Whether a follow-up is proposed is decided here, by route (architecture section 2), never by
     // the model: `followUpTask` is an optional field the model may leave null, so letting it decide
@@ -318,6 +343,9 @@ export class AssistantService {
         rejected: extraction.rejected,
         propertyRefs: extraction.propertyRefs,
         state: merged,
+        // Additive and internal, like `state`: a later chat turn that says nothing about timing
+        // inherits this instead of re-resolving it to "unknown".
+        timing: { dueAt, needsClarification },
       },
       // architecture section 3.6: a removed recommendation is recorded with its reason, so a
       // carried-forward listing that no longer fits is visible rather than silently vanishing.
@@ -327,6 +355,50 @@ export class AssistantService {
         ...extraction.rejected.map((r) => ({ step: 'field_rejected' as const, field: r.field, reason: r.reason })),
       ],
     };
+  }
+
+  /**
+   * Resolves the follow-up date for a run.
+   *
+   * Two things matter here, both of which a chat turn gets wrong if handled naively:
+   *
+   * - **What the phrase is relative to.** TASK.md pins a lead's "tomorrow" to the day after *their
+   *   message* was sent, "even if Sara reads it a day later". The agent's own chat turn is instead
+   *   relative to now. `followUp.source` says which, so the anchor follows the quote rather than
+   *   the trigger.
+   * - **A turn that says nothing about timing must not erase it.** Timing is not part of
+   *   `RequirementsState`, so `mergeRequirements` cannot carry it. Without the inherited fallback a
+   *   chat turn re-derives from a null timing and reports "The lead did not say when to follow up."
+   *   on a run whose own message said exactly when -- and the newest run is the one Sara sees.
+   */
+  private resolveTiming(input: {
+    followUp: FollowUpTiming | null;
+    conversation: ConversationMessage[];
+    analysedMessageSentAt: Date;
+    timezone: string;
+    inherited: ResolvedTiming | null;
+  }): ResolvedTiming {
+    if (input.followUp === null) {
+      // Nothing stated this turn: keep whatever the parent already resolved, rather than
+      // re-deriving it as "unknown". An analysis run has nothing to inherit, so it still computes.
+      if (input.inherited !== null) return input.inherited;
+      return computeDueAt(null, input.analysedMessageSentAt, input.timezone);
+    }
+
+    const anchor =
+      input.followUp.source === AGENT_INSTRUCTION_SOURCE_ID
+        ? // The agent is speaking now, so "Tuesday" means the next Tuesday from today. Via luxon
+          // rather than `new Date()`, per CLAUDE.md; computeDueAt converts into the agent timezone.
+          DateTime.utc().toJSDate()
+        : this.sentAtOf(input.followUp.source, input.conversation) ?? input.analysedMessageSentAt;
+
+    return computeDueAt(input.followUp, anchor, input.timezone);
+  }
+
+  private sentAtOf(sourceId: string | undefined, conversation: ConversationMessage[]): Date | null {
+    if (sourceId === undefined) return null;
+    const message = conversation.find((m) => m.id === sourceId);
+    return message ? DateTime.fromISO(message.sentAt).toJSDate() : null;
   }
 
   private templateFor(chosenRoute: Exclude<Route, 'search' | 'property_question'>, leadName: string): TemplateOutput {
@@ -346,10 +418,12 @@ export class AssistantService {
     agencyId: string,
     candidates: Candidate[],
     requirements: RequirementsState,
-    trace: Trace,
+    // Entries rather than a Trace: the template routes carry recommendations forward without ever
+    // running the agent, so they have no Trace object to hand over.
+    traceEntries: ReturnType<Trace['toContract']>,
     carried: RecommendationCarry[] = [],
   ): Promise<{ accepted: RecommendationSnapshot[]; dropped: RejectedRecommendation[] }> {
-    const seenIds = collectSeenPropertyIds(trace.toContract());
+    const seenIds = collectSeenPropertyIds(traceEntries);
     // architecture section 3.6 step 3: a listing qualifies if it appeared in THIS run's tool output
     // OR was carried forward from the parent. Carried ids still face every other check below --
     // existence, agency scope, `available`, and the hard constraints -- so "re-verified" is literal.

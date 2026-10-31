@@ -158,7 +158,9 @@ export class Extractor {
     let followUp: FollowUpTiming | null = null;
     if (hasValidEvidence(raw.followUp) && raw.followUp.value) {
       const { kind, weekday, days, time } = raw.followUp.value;
-      followUp = { kind, weekday, days, time, raw: raw.followUp.evidence.quote };
+      // `source` is kept so the caller can anchor the date correctly: a phrase quoted from a lead's
+      // message is relative to that message, one from the agent's own turn is relative to now.
+      followUp = { kind, weekday, days, time, raw: raw.followUp.evidence.quote, source: raw.followUp.evidence.sourceId };
     } else if (raw.followUp.status === 'stated') {
       rejected.push({ field: 'followUp', reason: 'evidence quote not found in the cited message' });
     }

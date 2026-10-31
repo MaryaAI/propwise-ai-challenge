@@ -23,6 +23,20 @@ function textResult(payload: unknown) {
   };
 }
 
+/**
+ * A scripted tool call. Needed whenever a test wants the run to end up with recommendations: the
+ * guardrails reject any listing that did not appear in this run's own tool output ('not_seen'), so
+ * a model that only emits a final object can never produce a shortlist.
+ */
+function toolCallResult(toolCallId: string, toolName: string, input: unknown) {
+  return {
+    content: [{ type: 'tool-call' as const, toolCallId, toolName, input: JSON.stringify(input) }],
+    finishReason: { unified: 'tool-calls' as const, raw: undefined },
+    usage: usage(),
+    warnings: [],
+  };
+}
+
 const MISSING_FIELD = { value: null, evidence: { sourceId: '', quote: '' }, status: 'missing' as const };
 
 function minimalExtraction(overrides: Partial<Record<string, unknown>> = {}) {
@@ -464,6 +478,144 @@ describe('Assistant routes (against the test database, mocked model)', () => {
         .set('Authorization', `Bearer ${omarToken}`)
         .send({ content: 'hello' })
         .expect(404);
+    });
+  });
+
+  describe('a chat turn must not lose what the parent already resolved', () => {
+    interface RunBody {
+      id: string;
+      status: string;
+      requirements: { locations: string[] };
+      recommendations: { propertyId: string }[];
+      proposedActions: { needsClarification: string | null; task: { dueAt: string | null } }[];
+    }
+
+    /** Karim's seed message says "follow up with me tomorrow", so the parent resolves a real date. */
+    async function karimRunWithDate(token: string): Promise<RunBody> {
+      const lead = await request(app.getHttpServer()).get(`/leads/${KARIM}`).set('Authorization', `Bearer ${token}`).expect(200);
+      const messageId = lead.body.messages.find((m: { direction: string }) => m.direction === 'inbound').id;
+
+      scripted.push(
+        textResult(
+          minimalExtraction({
+            intent: 'requirements',
+            locations: { value: ['Dubai Marina'], evidence: { sourceId: messageId, quote: 'Dubai Marina' }, status: 'stated' },
+            followUp: {
+              value: { kind: 'tomorrow', weekday: null, days: null, time: null },
+              evidence: { sourceId: messageId, quote: 'tomorrow' },
+              status: 'stated',
+            },
+          }),
+        ),
+        textResult({ recommendations: [], summary: 'Nothing fits.', reply: 'Nothing fits.', followUpTask: null }),
+      );
+
+      const run = await request(app.getHttpServer())
+        .post(`/leads/${KARIM}/assistant/runs`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ messageId })
+        .expect(201);
+      expect(run.body.proposedActions[0].task.dueAt).toBeTruthy();
+      return run.body;
+    }
+
+    it('inherits the resolved date when the turn says nothing about timing', async () => {
+      const token = await login('sara@marinabay.test');
+      const parent = await karimRunWithDate(token);
+
+      // A narrowing turn: states a budget, says nothing about timing.
+      scripted.push(
+        textResult(minimalExtraction({ intent: 'requirements' })),
+        textResult({ recommendations: [], summary: 'Narrowed.', reply: 'Narrowed.', followUpTask: null }),
+      );
+      const chat = await request(app.getHttpServer())
+        .post(`/leads/${KARIM}/assistant/runs/${parent.id}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'Only show options under 1.9M' })
+        .expect(201);
+
+      expect(chat.body.proposedActions).toHaveLength(1);
+      // Previously this came back null with "The lead did not say when to follow up."
+      expect(chat.body.proposedActions[0].task.dueAt).toBe(parent.proposedActions[0].task.dueAt);
+      expect(chat.body.proposedActions[0].needsClarification).toBeNull();
+    });
+
+    it('keeps the shortlist on a template-route turn instead of reporting nothing fits', async () => {
+      const token = await login('sara@marinabay.test');
+      const lead = await request(app.getHttpServer()).get(`/leads/${KARIM}`).set('Authorization', `Bearer ${token}`).expect(200);
+      const messageId = lead.body.messages.find((m: { direction: string }) => m.direction === 'inbound').id;
+      const marinaProperty = await request(app.getHttpServer())
+        .get(`/properties?area=Dubai Marina&status=available`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const pick = marinaProperty.body.items[0];
+
+      scripted.push(
+        textResult(
+          minimalExtraction({
+            intent: 'requirements',
+            locations: { value: ['Dubai Marina'], evidence: { sourceId: messageId, quote: 'Dubai Marina' }, status: 'stated' },
+          }),
+        ),
+        // The search has to really happen, or the guardrails reject the pick as 'not_seen'.
+        toolCallResult('call-1', 'search_properties', { areas: ['Dubai Marina'], status: 'available' }),
+        textResult({
+          recommendations: [{ propertyId: pick.id, reason: 'Fits the brief.' }],
+          summary: 'One match.',
+          reply: 'One match.',
+          followUpTask: null,
+        }),
+      );
+      const parent = await request(app.getHttpServer())
+        .post(`/leads/${KARIM}/assistant/runs`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ messageId })
+        .expect(201);
+      expect(parent.body.recommendations).toHaveLength(1);
+
+      // change_follow_up takes the template branch: no agent call, so only ONE scripted response.
+      scripted.push(textResult(minimalExtraction({ intent: 'change_follow_up' })));
+      const chat = await request(app.getHttpServer())
+        .post(`/leads/${KARIM}/assistant/runs/${parent.body.id}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'Move the follow-up to Tuesday' })
+        .expect(201);
+
+      // Previously []: "nothing fits" for a lead whose listings had not changed.
+      expect(chat.body.recommendations).toHaveLength(1);
+      expect(chat.body.recommendations[0].propertyId).toBe(pick.id);
+      expect(chat.body.summary).not.toMatch(/has been rescheduled/);
+    });
+
+    it('recovers state from the last completed ancestor when the parent run failed', async () => {
+      const token = await login('sara@marinabay.test');
+      const parent = await karimRunWithDate(token);
+      expect(parent.requirements.locations).toEqual(['Dubai Marina']);
+
+      // A chat turn whose extraction never validates -> a failed run, persisting no state.
+      scripted.push(textResult({ not: 'valid' }), textResult({ still: 'not valid' }));
+      const failed = await request(app.getHttpServer())
+        .post(`/leads/${KARIM}/assistant/runs/${parent.id}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'anything' })
+        .expect(201);
+      expect(failed.body.status).toBe('failed');
+      expect(failed.body.requirements.locations).toEqual([]);
+
+      // Retrying on the FAILED run must not lose Karim's requirements.
+      scripted.push(
+        textResult(minimalExtraction({ intent: 'requirements' })),
+        textResult({ recommendations: [], summary: 'ok', reply: 'ok', followUpTask: null }),
+      );
+      const retry = await request(app.getHttpServer())
+        .post(`/leads/${KARIM}/assistant/runs/${failed.body.id}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'What about the yield?' })
+        .expect(201);
+
+      expect(retry.body.status).toBe('completed');
+      // Previously [] -- which also disabled the area/bedrooms/type guardrail checks.
+      expect(retry.body.requirements.locations).toEqual(['Dubai Marina']);
     });
   });
 
