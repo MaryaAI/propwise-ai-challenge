@@ -78,6 +78,78 @@ export interface Page<T> {
   total: number;
 }
 
+/** What the assistant understood from the conversation. `bedrooms: 0` is a studio. */
+export interface AssistantRequirements {
+  locations: string[];
+  bedrooms: number | null;
+  budgetAed: { min: number | null; max: number | null };
+  propertyType: 'apartment' | 'villa' | 'townhouse' | 'penthouse' | null;
+  intent: 'buy' | 'rent' | 'unknown';
+  preferences: string[];
+}
+
+export interface Recommendation {
+  propertyId: string;
+  reason: string;
+  /** A snapshot taken when the run was saved, so the panel needs no second request. */
+  property: {
+    reference: string;
+    title: string;
+    area: string;
+    bedrooms: number;
+    priceAed: number;
+    annualRentAed: number | null;
+    /** Null when the listing has no known rent. */
+    grossYield: number | null;
+    status: string;
+  };
+}
+
+export interface ProposedAction {
+  id: string;
+  type: 'create_follow_up_task';
+  status: 'pending_approval' | 'approved' | 'rejected';
+  task: {
+    title: string;
+    notes: string | null;
+    /** ISO 8601 with the agent's offset, e.g. "2026-11-01T10:00:00+04:00". */
+    dueAt: string | null;
+  };
+  needsClarification: string | null;
+}
+
+export interface TraceEntry {
+  tool: string;
+  input: unknown;
+  /** Present on a call that succeeded (null if the tool returned nothing). */
+  output?: unknown;
+  /** Present instead of `output` on a call that failed. */
+  error?: string;
+  durationMs: number;
+}
+
+export interface AssistantRun {
+  id: string;
+  leadId: string;
+  messageId: string;
+  status: 'completed' | 'failed';
+  /** Absent rather than null when the run succeeded. */
+  error?: string;
+  requirements: AssistantRequirements;
+  recommendations: Recommendation[];
+  /** What the agent should know. Always a string. */
+  summary: string;
+  proposedActions: ProposedAction[];
+  trace: TraceEntry[];
+  createdAt: string;
+  parentRunId: string | null;
+  trigger: 'analysis' | 'chat';
+  /** What the agent typed, on a chat turn. */
+  agentMessage: string | null;
+  /** The conversational text, as opposed to `summary`. Always a string. */
+  reply: string;
+}
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export class ApiError extends Error {
@@ -128,4 +200,33 @@ export const api = {
   updateTask: (token: string, taskId: string, changes: Partial<Pick<Task, 'status'>>) =>
     request<Task>(`/tasks/${taskId}`, token, { method: 'PATCH', body: JSON.stringify(changes) }),
   getProperty: (token: string, propertyId: string) => request<Property>(`/properties/${propertyId}`, token),
+
+  /** Analyses a lead's message. Defaults to their latest inbound one. Can take up to 100 seconds. */
+  createRun: (token: string, leadId: string, messageId?: string) =>
+    request<AssistantRun>(`/leads/${leadId}/assistant/runs`, token, {
+      method: 'POST',
+      body: JSON.stringify(messageId ? { messageId } : {}),
+    }),
+  getRun: (token: string, leadId: string, runId: string) =>
+    request<AssistantRun>(`/leads/${leadId}/assistant/runs/${runId}`, token),
+  /** Newest first. */
+  listRuns: (token: string, leadId: string, limit = 20) =>
+    request<Page<AssistantRun>>(`/leads/${leadId}/assistant/runs?limit=${limit}`, token),
+  /** A follow-up turn. Returns a NEW run whose parentRunId is the one passed in. */
+  sendChatMessage: (token: string, leadId: string, runId: string, content: string) =>
+    request<AssistantRun>(`/leads/${leadId}/assistant/runs/${runId}/messages`, token, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
+  /** The only path that creates a task. Approving twice returns the same task. */
+  approveAction: (token: string, leadId: string, runId: string, actionId: string) =>
+    request<{ action: ProposedAction; task: Task }>(
+      `/leads/${leadId}/assistant/runs/${runId}/actions/${actionId}/approve`,
+      token,
+      { method: 'POST' },
+    ),
+  rejectAction: (token: string, leadId: string, runId: string, actionId: string) =>
+    request<{ action: ProposedAction }>(`/leads/${leadId}/assistant/runs/${runId}/actions/${actionId}/reject`, token, {
+      method: 'POST',
+    }),
 };
