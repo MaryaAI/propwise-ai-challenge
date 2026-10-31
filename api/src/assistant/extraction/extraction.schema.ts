@@ -15,6 +15,13 @@ function Field<T extends z.ZodTypeAny>(value: T) {
 export const ExtractionSchema = z.object({
   intent: z.enum(['requirements', 'property_question', 'change_follow_up', 'other']),
   closed: z.boolean(),
+  /**
+   * Where `closed: true` was read from. Evidence-gated like every other decision input, because
+   * closing a lead suppresses the follow-up entirely -- so untrusted text must not be able to do
+   * it. Not a `Field()` and not nullable, so it adds no union-typed parameter: the schema is at
+   * Anthropic's structured-output limit of 16 (see PLAN.md A13). Empty strings mean "no evidence".
+   */
+  closedEvidence: EvidenceSchema,
   locations: Field(z.array(z.string())),
   bedrooms: Field(z.object({ min: z.number().int().min(0).max(20), max: z.number().int().min(0).max(20) })),
   budget: Field(

@@ -26,7 +26,7 @@ export function buildExtractionSystemPrompt(): string {
     'transaction: infer "buy" when the message shows a purchase-scale budget (roughly 500k AED or more) or investor language such as yield, ROI, capital appreciation, or renting the place out -- an investor buying in order to let is still "buy". Infer "rent" only from an explicit request to rent or lease a home to live in, or an annual/monthly rent budget. Cite the phrase that shows it as evidence. Use "missing" only when neither is implied.',
     'followUp: classify the timing phrase only -- never compute an actual date.',
     'intent: "requirements" when the lead is describing what they want; "property_question" for a question about a specific listing; "change_follow_up" for a request to change a previously scheduled follow-up; "other" otherwise (including a bare greeting with no requirements).',
-    'closed: true only when the lead explicitly says they are no longer interested.',
+    'closed: true only when the lead explicitly says they are no longer interested. When you set it, closedEvidence must quote their own words verbatim, with the id of the message they are in; otherwise leave closed false and set closedEvidence to empty strings.',
   ].join('\n');
 }
 

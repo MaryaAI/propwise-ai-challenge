@@ -165,6 +165,20 @@ export class Extractor {
       rejected.push({ field: 'followUp', reason: 'evidence quote not found in the cited message' });
     }
 
-    return { update, intent: raw.intent, closed: raw.closed, followUp, propertyRefs: raw.propertyRefs, rejected };
+    // `closed` is evidence-gated like every other decision input. Closing a lead sends the run to
+    // the `closed` route, which proposes NO follow-up and reports "no longer interested" -- so
+    // letting untrusted text set it would be a message changing what the assistant does, which
+    // TASK.md forbids. The lead has to have actually said it.
+    let closed = false;
+    if (raw.closed) {
+      const source = sourceById.get(raw.closedEvidence.sourceId);
+      if (source !== undefined && quoteExists(raw.closedEvidence.quote, source)) {
+        closed = true;
+      } else {
+        rejected.push({ field: 'closed', reason: 'evidence quote not found in the cited message' });
+      }
+    }
+
+    return { update, intent: raw.intent, closed, followUp, propertyRefs: raw.propertyRefs, rejected };
   }
 }

@@ -43,6 +43,7 @@ function minimalExtraction(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     intent: 'other',
     closed: false,
+    closedEvidence: { sourceId: '', quote: '' },
     locations: MISSING_FIELD,
     bedrooms: MISSING_FIELD,
     budget: MISSING_FIELD,
@@ -355,9 +356,39 @@ describe('Assistant routes (against the test database, mocked model)', () => {
       });
     });
 
-    it('proposes nothing when the lead closed the conversation', async () => {
+    it('proposes nothing when the lead really said they are done', async () => {
       const token = await login('sara@marinabay.test');
-      scripted.push(textResult(minimalExtraction({ closed: true })));
+      const message = await request(app.getHttpServer())
+        .post(`/leads/${HASSAN}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ direction: 'inbound', channel: 'whatsapp', body: 'We bought elsewhere, not interested any more.' })
+        .expect(201);
+
+      scripted.push(
+        textResult(
+          minimalExtraction({
+            closed: true,
+            closedEvidence: { sourceId: message.body.id, quote: 'not interested any more' },
+          }),
+        ),
+      );
+
+      const response = await request(app.getHttpServer())
+        .post(`/leads/${HASSAN}/assistant/runs`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ messageId: message.body.id })
+        .expect(201);
+
+      expect(response.body.status).toBe('completed');
+      expect(response.body.proposedActions).toEqual([]);
+    });
+
+    it('still proposes a follow-up when a close is claimed without evidence', async () => {
+      // The injection shape: text that talks the model into closing the lead would otherwise
+      // suppress the follow-up and report them as no longer interested. Hassan's seed message is
+      // just "Hi", so there is nothing to quote and the close must not take effect.
+      const token = await login('sara@marinabay.test');
+      scripted.push(textResult(minimalExtraction({ closed: true, closedEvidence: { sourceId: '', quote: '' } })));
 
       const response = await request(app.getHttpServer())
         .post(`/leads/${HASSAN}/assistant/runs`)
@@ -366,7 +397,11 @@ describe('Assistant routes (against the test database, mocked model)', () => {
         .expect(201);
 
       expect(response.body.status).toBe('completed');
-      expect(response.body.proposedActions).toEqual([]);
+      expect(response.body.proposedActions).toHaveLength(1);
+      expect(response.body.summary).not.toMatch(/no longer interested/i);
+      expect(response.body.steps).toEqual(
+        expect.arrayContaining([expect.objectContaining({ step: 'field_rejected', field: 'closed' })]),
+      );
     });
   });
 

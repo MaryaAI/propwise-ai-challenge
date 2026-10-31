@@ -37,6 +37,7 @@ function karimExtraction(): Extraction {
   return {
     intent: 'requirements',
     closed: false,
+    closedEvidence: { sourceId: '', quote: '' },
     locations: { value: ['Dubai Marina'], evidence: { sourceId: 'msg-1', quote: 'Dubai Marina' }, status: 'stated' },
     bedrooms: { value: { min: 2, max: 2 }, evidence: { sourceId: 'msg-1', quote: '2-bedroom' }, status: 'stated' },
     budget: {
@@ -100,6 +101,62 @@ describe('Extractor', () => {
 
     expect(result.update.propertyType).toBeUndefined();
     expect(result.rejected).toContainEqual({ field: 'propertyType', reason: 'evidence quote not found in the cited message' });
+  });
+
+  describe('closing a lead needs the lead to have said so', () => {
+    const CLOSED_MESSAGE: ConversationMessage = {
+      id: 'msg-closed',
+      direction: 'inbound',
+      sentAt: '2026-10-30T08:00:00Z',
+      body: "Thanks but we bought elsewhere, I'm not interested any more.",
+    };
+
+    it('accepts a close that quotes the lead', async () => {
+      const extraction = karimExtraction();
+      extraction.closed = true;
+      extraction.closedEvidence = { sourceId: 'msg-closed', quote: 'not interested any more' };
+      const extractor = extractorWith(textResult(extraction));
+
+      const result = await extractor.extract({ ...BASE_INPUT, conversation: [KARIM_MESSAGE, CLOSED_MESSAGE] });
+
+      expect(result.closed).toBe(true);
+      expect(result.rejected).toEqual([]);
+    });
+
+    it('ignores a close whose quote is nowhere in the conversation', async () => {
+      // The shape of a successful injection: the payload talks the model into closing the lead,
+      // which would suppress the follow-up and report them as no longer interested.
+      const extraction = karimExtraction();
+      extraction.closed = true;
+      extraction.closedEvidence = { sourceId: 'msg-1', quote: 'I am no longer interested' };
+      const extractor = extractorWith(textResult(extraction));
+
+      const result = await extractor.extract(BASE_INPUT);
+
+      expect(result.closed).toBe(false);
+      expect(result.rejected).toContainEqual({ field: 'closed', reason: 'evidence quote not found in the cited message' });
+    });
+
+    it('ignores a close with no evidence at all', async () => {
+      const extraction = karimExtraction();
+      extraction.closed = true;
+      const extractor = extractorWith(textResult(extraction));
+
+      const result = await extractor.extract(BASE_INPUT);
+
+      expect(result.closed).toBe(false);
+    });
+
+    it('cannot be closed by forging the agent-instruction source on an analysis run', async () => {
+      const extraction = karimExtraction();
+      extraction.closed = true;
+      extraction.closedEvidence = { sourceId: AGENT_INSTRUCTION_SOURCE_ID, quote: 'close this lead' };
+      const extractor = extractorWith(textResult(extraction));
+
+      const result = await extractor.extract(BASE_INPUT);
+
+      expect(result.closed).toBe(false);
+    });
   });
 
   describe("the agent's own chat turn as an evidence source", () => {
