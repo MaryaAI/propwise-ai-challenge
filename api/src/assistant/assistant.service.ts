@@ -12,7 +12,7 @@ import { ExtractionFailedError, Extractor } from './extraction/extractor';
 import { AGENT_INSTRUCTION_SOURCE_ID, ConversationMessage } from './extraction/prompts';
 import { computeDueAt } from './policy/follow-up-date';
 import { bedroomsRange, emptyRequirementsState, mergeRequirements, toAgentBrief, toContractRequirements } from './policy/merge';
-import { filterRecommendations, grossYield, selectRecommendations } from './policy/guardrails';
+import { effectiveMaxAed, filterRecommendations, grossYield, selectRecommendations } from './policy/guardrails';
 import { route } from './policy/router';
 import { changeFollowUpTemplate, clarifyTemplate, closedTemplate, followUpTitle, rentTemplate, TemplateOutput } from './policy/templates';
 import { Candidate, ContractRequirements, FollowUpTiming, PropertyFacts, RequirementsState, ResolvedTiming, Route } from './types';
@@ -35,6 +35,25 @@ interface RecommendationSnapshot {
 }
 
 type RejectedRecommendation = { propertyId: string; why: string };
+
+/**
+ * Records that the lead's wording widened the price ceiling, when it did. Without this, a
+ * recommendation priced above the `budgetAed.max` in the same response looks like an arithmetic
+ * error rather than the deliberate 5% tolerance on "around".
+ */
+function budgetToleranceStep(state: RequirementsState) {
+  const budget = state.budget?.value ?? null;
+  const effective = effectiveMaxAed(budget);
+  if (budget === null || budget.maxAed === null || effective === null || effective === budget.maxAed) return [];
+  return [
+    {
+      step: 'budget_tolerance' as const,
+      qualifier: budget.qualifier,
+      statedMaxAed: budget.maxAed,
+      effectiveMaxAed: effective,
+    },
+  ];
+}
 
 function emptyContractRequirements(): ContractRequirements {
   return { locations: [], bedrooms: null, budgetAed: { min: null, max: null }, propertyType: null, intent: 'unknown', preferences: [] };
@@ -343,6 +362,12 @@ export class AssistantService {
         rejected: extraction.rejected,
         propertyRefs: extraction.propertyRefs,
         state: merged,
+        // `requirements.budgetAed` stays literally what the lead said, which is what "what was
+        // understood" means -- but a qualifier like "around" widens the ceiling used for matching,
+        // so a recommendation can sit above the reported max. This is that real ceiling, exposed
+        // here rather than inside `budgetAed`: adding a key to an existing contract field would
+        // change its shape, which TASK.md forbids, while `extraction` is additive already.
+        budgetEffectiveMaxAed: effectiveMaxAed(merged.budget?.value ?? null),
         // Additive and internal, like `state`: a later chat turn that says nothing about timing
         // inherits this instead of re-resolving it to "unknown".
         timing: { dueAt, needsClarification },
@@ -351,6 +376,7 @@ export class AssistantService {
       // carried-forward listing that no longer fits is visible rather than silently vanishing.
       steps: [
         { step: 'route', route: chosenRoute, trigger },
+        ...budgetToleranceStep(merged),
         ...droppedRecommendations.map((d) => ({ step: 'recommendation_rejected' as const, propertyId: d.propertyId, reason: d.why })),
         ...extraction.rejected.map((r) => ({ step: 'field_rejected' as const, field: r.field, reason: r.reason })),
       ],

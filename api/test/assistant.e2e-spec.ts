@@ -356,6 +356,75 @@ describe('Assistant routes (against the test database, mocked model)', () => {
       });
     });
 
+    it('discloses the widened ceiling when the lead said "around"', async () => {
+      // requirements.budgetAed stays literally what the lead said, so a recommendation can sit
+      // above it. The real ceiling has to be findable or that looks like an arithmetic error.
+      const token = await login('sara@marinabay.test');
+      const messageId = await karimInboundMessageId(token);
+
+      scripted.push(
+        textResult(
+          minimalExtraction({
+            intent: 'requirements',
+            locations: { value: ['Dubai Marina'], evidence: { sourceId: messageId, quote: 'Dubai Marina' }, status: 'stated' },
+            budget: {
+              value: { minAed: null, maxAed: 2_000_000, qualifier: 'around' },
+              evidence: { sourceId: messageId, quote: 'around 2M AED' },
+              status: 'stated',
+            },
+          }),
+        ),
+        textResult({ recommendations: [], summary: 'Nothing fits.', reply: 'Nothing fits.', followUpTask: null }),
+      );
+
+      const response = await request(app.getHttpServer())
+        .post(`/leads/${KARIM}/assistant/runs`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ messageId })
+        .expect(201);
+
+      // The contract field is untouched: it is what the lead said.
+      expect(response.body.requirements.budgetAed).toEqual({ min: null, max: 2_000_000 });
+      // The ceiling actually used is disclosed additively, and recorded in the audit trail.
+      expect(response.body.extraction.budgetEffectiveMaxAed).toBe(2_100_000);
+      expect(response.body.steps).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ step: 'budget_tolerance', statedMaxAed: 2_000_000, effectiveMaxAed: 2_100_000 }),
+        ]),
+      );
+    });
+
+    it('does not widen the ceiling for "under"', async () => {
+      const token = await login('sara@marinabay.test');
+      const messageId = await karimInboundMessageId(token);
+
+      scripted.push(
+        textResult(
+          minimalExtraction({
+            intent: 'requirements',
+            locations: { value: ['Dubai Marina'], evidence: { sourceId: messageId, quote: 'Dubai Marina' }, status: 'stated' },
+            budget: {
+              value: { minAed: null, maxAed: 2_000_000, qualifier: 'under' },
+              evidence: { sourceId: messageId, quote: 'around 2M AED' },
+              status: 'stated',
+            },
+          }),
+        ),
+        textResult({ recommendations: [], summary: 'Nothing fits.', reply: 'Nothing fits.', followUpTask: null }),
+      );
+
+      const response = await request(app.getHttpServer())
+        .post(`/leads/${KARIM}/assistant/runs`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ messageId })
+        .expect(201);
+
+      expect(response.body.extraction.budgetEffectiveMaxAed).toBe(2_000_000);
+      expect(response.body.steps).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ step: 'budget_tolerance' })]),
+      );
+    });
+
     it('proposes nothing when the lead really said they are done', async () => {
       const token = await login('sara@marinabay.test');
       const message = await request(app.getHttpServer())
