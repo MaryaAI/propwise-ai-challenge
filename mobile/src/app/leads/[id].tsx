@@ -33,11 +33,16 @@ export default function LeadScreen() {
       .catch(handleError);
   }, [session, id, handleError]);
 
+  const loadTasks = useCallback(async () => {
+    if (!session) return;
+    setTasks(await api.listTasks(session.token, id));
+  }, [session, id]);
+
   async function toggleTask(task: Task) {
     if (!session) return;
     try {
       await api.updateTask(session.token, task.id, { status: task.status === 'done' ? 'open' : 'done' });
-      setTasks(await api.listTasks(session.token, id));
+      await loadTasks();
     } catch (err) {
       handleError(err);
     }
@@ -60,7 +65,7 @@ export default function LeadScreen() {
           <Text style={styles.meta}>{[lead.phone, lead.email, `via ${lead.source}`].filter(Boolean).join(' · ')}</Text>
           {lead.notes && <Text style={styles.meta}>{lead.notes}</Text>}
 
-          <AssistantPanel lead={lead} />
+          <AssistantPanel lead={lead} onTaskCreated={loadTasks} onError={handleError} />
 
           <Text style={styles.section}>Conversation</Text>
           <MessageThread messages={lead.messages} timeZone={timeZone} />
