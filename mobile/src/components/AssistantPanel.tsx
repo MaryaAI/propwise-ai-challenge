@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { api, type AssistantRun, type LeadDetail, type ProposedAction } from '../lib/api';
+import { api, type AssistantRun, type LeadDetail } from '../lib/api';
+import { liveProposal } from '../lib/assistant';
 import { useSession } from '../lib/session';
 import { ActionCard } from './ActionCard';
 import { RunCard } from './RunCard';
@@ -13,22 +14,10 @@ interface Props {
   onError: (error: unknown) => void;
 }
 
-/** Where the live proposal is: the newest action still awaiting a decision, searched newest-first. */
-function pendingProposal(runs: AssistantRun[]): { run: AssistantRun; action: ProposedAction } | null {
-  for (const run of runs) {
-    const action = run.proposedActions.find((candidate) => candidate.status === 'pending_approval');
-    if (action) return { run, action };
-  }
-  return null;
-}
-
 /**
  * The AI assistant for one lead. Same result and the same Approve/Reject as the web panel; chat is
- * web-only (PLAN.md's cut line puts mobile chat first to drop).
- *
- * Only one proposal is ever shown, found by scanning the run chain newest-first rather than read
- * off the newest run -- a chat turn leaves the previous run's action pending (decision 10) and a
- * property_question turn proposes nothing while an older action is still live (A15).
+ * web-only (PLAN.md's cut line puts mobile chat first to drop). Only ever one proposal is shown --
+ * see `liveProposal` for why that has to be a search over the run chain.
  */
 export function AssistantPanel({ lead, onTaskCreated, onError }: Props) {
   const { session } = useSession();
@@ -68,7 +57,7 @@ export function AssistantPanel({ lead, onTaskCreated, onError }: Props) {
 
   const hasInbound = lead.messages.some((message) => message.direction === 'inbound');
   const latest = runs[0] ?? null;
-  const proposal = pendingProposal(runs);
+  const proposal = liveProposal(runs);
 
   async function analyze() {
     if (!token) return;

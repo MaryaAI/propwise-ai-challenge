@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { api, type AssistantRun, type LeadDetail, type ProposedAction } from '@/lib/api';
+import { api, type AssistantRun, type LeadDetail } from '@/lib/api';
+import { liveProposal } from '@/lib/assistant';
 import { useSession } from '@/lib/session';
 import { ActionCard } from './ActionCard';
 import { RunCard } from './RunCard';
@@ -14,22 +15,9 @@ interface Props {
   onError: (error: unknown) => void;
 }
 
-/** Where the live proposal is: the newest action still awaiting a decision, searched newest-first. */
-function pendingProposal(runs: AssistantRun[]): { run: AssistantRun; action: ProposedAction } | null {
-  for (const run of runs) {
-    const action = run.proposedActions.find((candidate) => candidate.status === 'pending_approval');
-    if (action) return { run, action };
-  }
-  return null;
-}
-
 /**
- * The AI assistant for one lead.
- *
- * Only one proposal is ever shown. A chat turn creates a new run and leaves the previous run's
- * action pending (PLAN.md decision 10), and a `property_question` turn proposes nothing at all
- * while an older action is still live (amendment A15) -- so the action is found by scanning the
- * run chain newest-first rather than read off the newest run.
+ * The AI assistant for one lead. Only ever one proposal is shown -- see `liveProposal` for why
+ * that has to be a search over the run chain rather than a read of the newest run.
  */
 export function AssistantPanel({ lead, onTaskCreated, onError }: Props) {
   const { session } = useSession();
@@ -71,7 +59,7 @@ export function AssistantPanel({ lead, onTaskCreated, onError }: Props) {
 
   const hasInbound = lead.messages.some((message) => message.direction === 'inbound');
   const latest = runs[0] ?? null;
-  const proposal = pendingProposal(runs);
+  const proposal = liveProposal(runs);
   const conversation = [...runs].reverse().filter((run) => run.agentMessage !== null);
 
   async function analyze() {
