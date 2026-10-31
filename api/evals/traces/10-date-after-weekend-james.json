@@ -11,7 +11,7 @@
         "bedroomsMax": 1,
         "priceMaxAed": 1500000,
         "status": "available",
-        "sortBy": "size",
+        "sortBy": "yield",
         "limit": 20
       },
       "output": {
@@ -34,24 +34,43 @@
         ],
         "total": 1
       },
-      "durationMs": 3
+      "durationMs": 4
     },
     {
       "tool": "get_property",
       "input": {
-        "reference": "Marina Gate 2"
+        "id": "515c90a2-ce40-5d85-bd03-51c05ca25f21"
       },
       "output": {
-        "found": false
+        "found": true,
+        "property": {
+          "id": "515c90a2-ce40-5d85-bd03-51c05ca25f21",
+          "reference": "MBR-1009",
+          "title": "1BR in Marina Gate 2",
+          "area": "Dubai Marina",
+          "building": "Marina Gate 2",
+          "type": "apartment",
+          "bedrooms": 1,
+          "sizeSqft": 850,
+          "priceAed": 1450000,
+          "annualRentAed": 105000,
+          "grossYield": 0.0724,
+          "pricePerSqft": 1706,
+          "status": "available",
+          "bathrooms": 2,
+          "serviceChargeAedPerSqft": 22.5,
+          "listedAt": "2026-10-17T04:03:26.289Z"
+        },
+        "description": "<listing_description>One-bedroom with a study nook and marina views. Vacant.</listing_description>"
       },
-      "durationMs": 4
+      "durationMs": 1
     }
   ],
   "runs": [
     {
       "label": "createRun(ac364939-7391-5caa-90c7-6aefc6ee7908)",
       "payload": {
-        "id": "0e97a2ce-d382-4e97-97b9-4b19b07cec4c",
+        "id": "bb630db8-4dd6-4283-aa06-24043c4128b2",
         "leadId": "ac364939-7391-5caa-90c7-6aefc6ee7908",
         "messageId": "87cb28d2-3a64-58b2-96f5-d6358c5bf5db",
         "status": "completed",
@@ -67,20 +86,33 @@
           },
           "propertyType": null,
           "intent": "buy",
-          "preferences": [
-            "Larger unit than Marina Gate 2 viewing, which felt a bit small"
-          ]
+          "preferences": []
         },
-        "recommendations": [],
-        "summary": "One available 1BR in Jumeirah Lake Towers or Dubai Marina is at or under AED 1.5M. It is MBR-1009 in Marina Gate 2, the building the lead already viewed and found small. Nothing larger is available.",
+        "recommendations": [
+          {
+            "propertyId": "515c90a2-ce40-5d85-bd03-51c05ca25f21",
+            "reason": "MBR-1009, a 1BR in Marina Gate 2, Dubai Marina, is priced at AED 1,450,000, which is under the AED 1.5M cap. Gross yield is 7.24% (rent AED 105,000/yr) and status is available.",
+            "property": {
+              "reference": "MBR-1009",
+              "title": "1BR in Marina Gate 2",
+              "area": "Dubai Marina",
+              "bedrooms": 1,
+              "priceAed": 1450000,
+              "annualRentAed": 105000,
+              "grossYield": 0.07241379310344828,
+              "status": "available"
+            }
+          }
+        ],
+        "summary": "One available listing fits: a 1BR in Dubai Marina at AED 1,450,000. Searching JLT and Dubai Marina for 1BR up to AED 1.5M returned nothing in JLT.",
         "proposedActions": [
           {
-            "id": "aeaacb86-99e5-4442-89a0-32f47182bcb1",
+            "id": "5b2b35e5-7d58-44e2-812c-f50b459edeea",
             "type": "create_follow_up_task",
             "status": "pending_approval",
             "task": {
-              "title": "Ask lead about widening search for a larger 1BR",
-              "notes": "The only available 1BR up to AED 1.5M in JLT or Dubai Marina is MBR-1009 in Marina Gate 2 (850 sqft), which the lead found small. Ask whether they would raise the budget, add other areas, or consider 2BR units.",
+              "title": "Share MBR-1009 with lead and check JLT interest",
+              "notes": "Send details of MBR-1009 (Marina Gate 2, AED 1.45M, 7.24% gross yield). No JLT 1BR matched, so ask whether they would stretch the budget or consider other areas.",
               "dueAt": "2026-11-02T10:00:00+04:00"
             },
             "needsClarification": null
@@ -98,7 +130,7 @@
               "bedroomsMax": 1,
               "priceMaxAed": 1500000,
               "status": "available",
-              "sortBy": "size",
+              "sortBy": "yield",
               "limit": 20
             },
             "output": {
@@ -121,23 +153,43 @@
               ],
               "total": 1
             },
-            "durationMs": 3
+            "durationMs": 4
           },
           {
             "tool": "get_property",
             "input": {
-              "reference": "Marina Gate 2"
+              "id": "515c90a2-ce40-5d85-bd03-51c05ca25f21"
             },
             "output": {
-              "found": false
+              "found": true,
+              "property": {
+                "id": "515c90a2-ce40-5d85-bd03-51c05ca25f21",
+                "reference": "MBR-1009",
+                "title": "1BR in Marina Gate 2",
+                "area": "Dubai Marina",
+                "building": "Marina Gate 2",
+                "type": "apartment",
+                "bedrooms": 1,
+                "sizeSqft": 850,
+                "priceAed": 1450000,
+                "annualRentAed": 105000,
+                "grossYield": 0.0724,
+                "pricePerSqft": 1706,
+                "status": "available",
+                "bathrooms": 2,
+                "serviceChargeAedPerSqft": 22.5,
+                "listedAt": "2026-10-17T04:03:26.289Z"
+              },
+              "description": "<listing_description>One-bedroom with a study nook and marina views. Vacant.</listing_description>"
             },
-            "durationMs": 4
+            "durationMs": 1
           }
         ],
-        "createdAt": "2026-10-31T03:36:39.572Z",
+        "createdAt": "2026-10-31T04:06:51.623Z",
         "parentRunId": null,
         "trigger": "analysis",
-        "reply": "Sara, I have no listing that meets this brief. The only available 1BR in JLT or Dubai Marina up to AED 1,500,000 is MBR-1009 in Marina Gate 2. It is 850 sqft, priced at AED 1,450,000, with a gross yield of 7.24%. That building is the one the lead felt was small, so I haven't recommended it. You could ask the lead whether they'd raise the budget, add nearby areas, or look at 2BR units. I can search again once you have an answer.",
+        "agentMessage": null,
+        "reply": "Hi Sara, only one listing fits this lead. MBR-1009 is a 1BR in Marina Gate 2, Dubai Marina, at AED 1,450,000. It is 850 sqft with a 7.24% gross yield and is available. There are no matching 1BRs in JLT within the budget right now.",
         "extraction": {
           "bedroomsRange": {
             "min": 1,
@@ -189,19 +241,16 @@
                 "quote": "up to 1.5M"
               }
             },
-            "preferences": [
-              {
-                "value": "Larger unit than Marina Gate 2 viewing, which felt a bit small",
-                "source": "87cb28d2-3a64-58b2-96f5-d6358c5bf5db",
-                "evidence": {
-                  "sourceId": "87cb28d2-3a64-58b2-96f5-d6358c5bf5db",
-                  "quote": "it was nice but a bit small"
-                }
-              }
-            ]
+            "preferences": []
           }
         },
-        "steps": []
+        "steps": [
+          {
+            "step": "route",
+            "route": "search",
+            "trigger": "analysis"
+          }
+        ]
       }
     }
   ]

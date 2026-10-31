@@ -136,6 +136,21 @@ export async function getRun(app: INestApplication<App>, token: string, leadId: 
   return response.body;
 }
 
+/** A follow-up chat turn on an existing run. Returns the NEW run it creates. */
+export async function sendChatMessage(app: INestApplication<App>, token: string, leadId: string, runId: string, content: string) {
+  const response = await httpRequest(app, token, 'post', `/leads/${leadId}/assistant/runs/${runId}/messages`, { content });
+  record(`chat(${runId})`, response.body);
+  assert.strictEqual(response.status, 201, `sendChatMessage failed: ${JSON.stringify(response.body)}`);
+  return response.body;
+}
+
+export async function listRuns(app: INestApplication<App>, token: string, leadId: string, limit?: number) {
+  const path = limit === undefined ? `/leads/${leadId}/assistant/runs` : `/leads/${leadId}/assistant/runs?limit=${limit}`;
+  const response = await httpRequest(app, token, 'get', path);
+  assert.strictEqual(response.status, 200, `listRuns failed: ${JSON.stringify(response.body)}`);
+  return response.body;
+}
+
 /**
  * The lead's oldest inbound seed message. Cases pin this explicitly rather than relying on the
  * "latest inbound" default, which case 4 changes for Karim by appending a message mid-suite.

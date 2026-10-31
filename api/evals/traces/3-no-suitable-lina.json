@@ -18,14 +18,14 @@
         "items": [],
         "total": 0
       },
-      "durationMs": 45
+      "durationMs": 2
     }
   ],
   "runs": [
     {
       "label": "createRun(0bab04e6-d42d-521e-aa18-d256456a6b69)",
       "payload": {
-        "id": "0144bd1f-bb12-40f3-a6c3-77003556f7cb",
+        "id": "172b38d4-6b3b-483f-bbbf-eb5f7332c000",
         "leadId": "0bab04e6-d42d-521e-aa18-d256456a6b69",
         "messageId": "6fd52efc-4a8a-5dc8-b6d5-fa1f85a045db",
         "status": "completed",
@@ -43,15 +43,15 @@
           "preferences": []
         },
         "recommendations": [],
-        "summary": "No available 5-bedroom villas in Dubai Marina at or under AED 900,000 were found in this agency's listings.",
+        "summary": "No available 5-bedroom villas in Dubai Marina at or under AED 900,000 in this agency's listings. The search returned 0 matches.",
         "proposedActions": [
           {
-            "id": "3f1ceaa6-31bf-4257-b36c-6e4e1521bfb9",
+            "id": "d4285de0-ddff-4064-938f-9f1c4df1ad83",
             "type": "create_follow_up_task",
             "status": "pending_approval",
             "task": {
-              "title": "Discuss options with lead: no 5BR Dubai Marina villa under AED 900k",
-              "notes": "The search returned no matches. Ask the lead about a higher budget, nearby areas, or fewer bedrooms. Then re-run the search.",
+              "title": "Discuss budget/criteria options with lead – no Dubai Marina 5BR villa under AED 900k",
+              "notes": "Search found no available 5-bed villas in Dubai Marina under AED 900,000. Ask the lead whether they would raise the budget, widen the area, or change the bedroom count or property type. Then re-run the search.",
               "dueAt": null
             },
             "needsClarification": "The lead did not say when to follow up."
@@ -76,13 +76,14 @@
               "items": [],
               "total": 0
             },
-            "durationMs": 45
+            "durationMs": 2
           }
         ],
-        "createdAt": "2026-10-31T03:34:51.491Z",
+        "createdAt": "2026-10-31T04:04:10.995Z",
         "parentRunId": null,
         "trigger": "analysis",
-        "reply": "I searched our available listings for 5-bedroom villas in Dubai Marina priced at AED 900,000 or less. Nothing matched. You could ask the lead whether they would raise the budget, consider other areas, or look at a different property type or bedroom count. Tell me which to try and I'll search again.",
+        "agentMessage": null,
+        "reply": "I couldn't find any available 5-bedroom villas in Dubai Marina priced at or under AED 900,000, so I have no listings to recommend. Options to discuss with the lead: raise the budget, look at nearby areas, or consider a smaller villa or an apartment or townhouse in Dubai Marina.",
         "extraction": {
           "bedroomsRange": {
             "min": 5,
@@ -143,7 +144,13 @@
             "preferences": []
           }
         },
-        "steps": []
+        "steps": [
+          {
+            "step": "route",
+            "route": "search",
+            "trigger": "analysis"
+          }
+        ]
       }
     }
   ]

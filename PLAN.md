@@ -67,9 +67,11 @@ Done when: two consecutive runs give the same verdicts, and `REPORT.md` + `trace
 
 Done when: eval case 13 and case 7's chat form pass, and 5b's chat follow-up (get_property on a referenced property, no change to requirements/recommendations) passes.
 
-- [ ] `POST /runs/:runId/messages`: load parent, merge, no-agent routes, carry-forward recommendations re-verified
-- [ ] Eval case 13
-- [ ] Commit
+- [x] `POST /runs/:runId/messages`: load parent, merge, no-agent routes, carry-forward recommendations re-verified
+- [x] `GET /runs?limit=20`: the run history, newest first (deferred here from Phase 4)
+- [x] Eval case 13 (`13-chat-narrowing`), case 7's chat form (`7b-tool-choice-chat`), 5b's chat half (`5c-injection-chat-mbr1019`)
+- [x] 17/17 twice with identical verdicts
+- [x] Commit
 
 ## Phase 7 — Interfaces (30 min)
 
@@ -127,6 +129,13 @@ Done when: the delivery checklist (TASK.md's "When time is up") is complete.
 - **A11 — two real bugs found finishing Phase 3/4:**
   - `AgentRunner`'s 3b catch block discarded the trace on every failure path, even though architecture section 3.8 explicitly requires trace/steps to survive a failed run for diagnosis. Fixed: `AgentFailedError` now carries the trace, and any other rethrown error (`ToolInfraError`, an abort) gets `.trace` attached generically before leaving `AgentRunner.run()`, so `assistant.service.ts`'s failure path can still persist whatever tool calls happened before the failure.
   - `AssistantController`'s `approve`/`reject` routes returned `201 Created` instead of the contract's `200` — Nest's `@Post()` defaults to 201 unless told otherwise. Caught immediately by the new e2e spec (4 failing assertions, all `expected 200, got 201`); fixed with `@HttpCode(200)` on both routes.
+- **A15 — Phase 6 decisions:**
+  - **`property_question` runs the agent, not a template.** `templateFor` threw for it; architecture section 2's table puts it through stage 5, so it joins `search` in the agent branch and only `change_follow_up` gained a template. It needs a **route-specific system prompt**: the search-mode rules are a standing instruction to call `search_properties` with the lead's filters, which would have made architecture's own case-7 assertion ("the trace does not contain `search_properties`") unreachable.
+  - **Carry-forward seeds candidates, not just `seenIds`.** Adding the parent's ids to `seenIds` alone does nothing, because `facts` is derived from `candidates` — an id only in `seenIds` is never fetched and so can never be recommended. On `property_question` the candidate list is therefore the parent's snapshots, which then face the existing existence / agency / `available` / hard-constraint checks unchanged. Without this, a "what's the service charge?" turn where the agent correctly returns `[]` would have wiped the shortlist.
+  - **A chat turn's timing anchors on the turn, not the parent's message.** `computeDueAt` anchors on `message.sentAt`, and a chat run reuses the parent's (older) lead message, so "move it to Tuesday" could resolve to a Tuesday already past. Chat anchors on now, via luxon rather than `new Date()`.
+  - **A chat turn proposes an action only where its route does.** `property_question` proposes none (architecture section 2: the parent's carries forward if pending). An action is reachable only under its own run's URL, so duplicating the parent's into the child would let the same follow-up be approved twice into two separate tasks.
+  - **`agentMessage` is exposed in the response** (additive) — without it a chat UI cannot render the agent's own turns.
+  - **Case 7's non-chat stand-in lost its negative assertion.** While standing in for the real case 7 it asserted `get_property` is absent on an analysis run. A real run searched and then called `get_property` on `MBR-1022` to read its full record before writing a reason — exactly what the prompt's "never state a price, yield or status you did not read from a tool" asks for, and forbidden by nothing in `TASK.md` or the architecture. It now asserts the positive claim plus that the filters reach the tool (including `priceMaxAed: 2_100_000`, which pins A12's tolerance fix); the genuine discrimination lives in `7b-tool-choice-chat`.
 - **A13 — three bugs found actually running the eval suite (Phase 5):**
   - **`tsx` silently drops decorator metadata.** `evals/run.ts` ran under `tsx`, whose esbuild transform does not emit TypeScript's `design:paramtypes`. Every implicitly-typed constructor injection in the Nest app therefore resolved to `undefined` once booted from the eval script — `AuthGuard`'s `Reflector` was `undefined` and every request 500'd, so the suite could not log in at all. `ts-node` emits the metadata correctly, including under `--transpile-only`; the `eval` script now uses it. The Jest suites were never affected because `ts-jest` uses the real compiler.
   - **The extraction schema exceeded Anthropic's structured-output union limit.** `ExtractionSchema` had 17 union-typed fields against a limit of 16, so every extraction request was rejected before reaching the model ("too many parameters with union types"). `Field()`'s `evidence` is now always present instead of nullable, with empty `sourceId`/`quote` as the "no evidence" sentinel — `quoteExists` already rejects an empty quote, so validation behaviour is unchanged.

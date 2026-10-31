@@ -6,13 +6,14 @@
         "type": "apartment",
         "bedroomsMin": 2,
         "bedroomsMax": 2,
+        "priceMinAed": 2000000,
         "priceMaxAed": 2100000,
         "status": "available",
         "sortBy": "yield",
         "limit": 10
       },
       "error": "simulated infrastructure failure",
-      "durationMs": 1
+      "durationMs": 0
     }
   ],
   "runs": []

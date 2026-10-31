@@ -9,11 +9,10 @@
         "type": "apartment",
         "bedroomsMin": 2,
         "bedroomsMax": 2,
-        "priceMinAed": 2000000,
         "priceMaxAed": 2100000,
         "status": "available",
         "sortBy": "yield",
-        "limit": 10
+        "limit": 20
       },
       "output": {
         "items": [
@@ -33,6 +32,36 @@
             "status": "available"
           },
           {
+            "id": "c6df63e6-cf34-5246-a932-498ce3585c12",
+            "reference": "MBR-1007",
+            "title": "Value 2BR in Marina Diamond 2",
+            "area": "Dubai Marina",
+            "building": "Marina Diamond 2",
+            "type": "apartment",
+            "bedrooms": 2,
+            "sizeSqft": 1100,
+            "priceAed": 1650000,
+            "annualRentAed": 118000,
+            "grossYield": 0.0715,
+            "pricePerSqft": 1500,
+            "status": "available"
+          },
+          {
+            "id": "21a641ec-60a8-5886-b8ec-7ae82baa48b8",
+            "reference": "MBR-1002",
+            "title": "Spacious 2BR in Princess Tower",
+            "area": "Dubai Marina",
+            "building": "Princess Tower",
+            "type": "apartment",
+            "bedrooms": 2,
+            "sizeSqft": 1410,
+            "priceAed": 1890000,
+            "annualRentAed": 125000,
+            "grossYield": 0.0661,
+            "pricePerSqft": 1340,
+            "status": "available"
+          },
+          {
             "id": "bcb641ba-26bb-5bbc-8672-ba7a3c2edbff",
             "reference": "MBR-1022",
             "title": "2BR in Marina Quays West",
@@ -48,9 +77,9 @@
             "status": "available"
           }
         ],
-        "total": 2
+        "total": 4
       },
-      "durationMs": 3
+      "durationMs": 4
     },
     {
       "tool": "search_properties",
@@ -102,16 +131,16 @@
         ],
         "total": 2
       },
-      "durationMs": 2
+      "durationMs": 4
     }
   ],
   "runs": [
     {
       "label": "createRun(310661c8-6de3-5b3f-80c8-ca4ef71e55b1)",
       "payload": {
-        "id": "028e433e-ab38-4667-be7b-c12ea003fd3b",
+        "id": "98955ccf-59f4-4f0f-a6d0-99fbc0ad6c0a",
         "leadId": "310661c8-6de3-5b3f-80c8-ca4ef71e55b1",
-        "messageId": "832d91ac-19f2-4f66-8c8c-593157febce4",
+        "messageId": "fa8c9997-dcb7-48c2-a96e-eb26172bf969",
         "status": "completed",
         "requirements": {
           "locations": [
@@ -131,7 +160,7 @@
         "recommendations": [
           {
             "propertyId": "473a131f-4f8c-52d5-88d5-88ac173f49ea",
-            "reason": "MBR-1001, a Marina Gate 1 2BR, is available at AED 2,050,000. Its gross yield is 7.32% (annual rent AED 150,000), which fits the lead's yield preference.",
+            "reason": "MBR-1001, Marina Gate 1: AED 2,050,000, gross yield 7.32% (the highest of the matches), status available. It is the closest to the AED 2M budget.",
             "property": {
               "reference": "MBR-1001",
               "title": "Marina-view 2BR in Marina Gate 1",
@@ -142,31 +171,17 @@
               "grossYield": 0.07317073170731707,
               "status": "available"
             }
-          },
-          {
-            "propertyId": "bcb641ba-26bb-5bbc-8672-ba7a3c2edbff",
-            "reason": "MBR-1022, a Marina Quays West 2BR, is available at AED 2,099,000, within the AED 2.1M ceiling. No annual rent is on file, so its gross yield is unknown and has to be confirmed before it is pitched as a yield play.",
-            "property": {
-              "reference": "MBR-1022",
-              "title": "2BR in Marina Quays West",
-              "area": "Dubai Marina",
-              "bedrooms": 2,
-              "priceAed": 2099000,
-              "annualRentAed": null,
-              "grossYield": null,
-              "status": "available"
-            }
           }
         ],
-        "summary": "Two available 2BR apartments in Dubai Marina fall within AED 2.0M–2.1M. MBR-1001 has a confirmed gross yield of 7.32%. MBR-1022 matches on price, location and bedrooms, but its rental figure is missing.",
+        "summary": "Three available 2BR apartments in Dubai Marina are at or under the AED 2.1M ceiling and have a known yield. They range from 6.61% to 7.32% gross. A fourth match, MBR-1022 at AED 2,099,000, has no rent figure on file, so I left it out.",
         "proposedActions": [
           {
-            "id": "732ffc67-7172-4868-8617-26867bc7762e",
+            "id": "48f0c662-7ebe-4563-9fb5-b65eb63a92b2",
             "type": "create_follow_up_task",
             "status": "pending_approval",
             "task": {
-              "title": "Send MBR-1001 to lead and confirm rent for MBR-1022",
-              "notes": "Share MBR-1001 (AED 2.05M, 7.32% gross yield) with the lead. Get the expected annual rent for MBR-1022 (AED 2.099M) to work out its yield before sharing it. Offer viewings for both.",
+              "title": "Share Dubai Marina 2BR shortlist with lead",
+              "notes": "Send MBR-1001, MBR-1007 and MBR-1002 and ask about viewings. Confirm the rent for MBR-1022 before offering it, because its yield is unknown.",
               "dueAt": null
             },
             "needsClarification": "call me sometime next week"
@@ -182,11 +197,10 @@
               "type": "apartment",
               "bedroomsMin": 2,
               "bedroomsMax": 2,
-              "priceMinAed": 2000000,
               "priceMaxAed": 2100000,
               "status": "available",
               "sortBy": "yield",
-              "limit": 10
+              "limit": 20
             },
             "output": {
               "items": [
@@ -206,6 +220,36 @@
                   "status": "available"
                 },
                 {
+                  "id": "c6df63e6-cf34-5246-a932-498ce3585c12",
+                  "reference": "MBR-1007",
+                  "title": "Value 2BR in Marina Diamond 2",
+                  "area": "Dubai Marina",
+                  "building": "Marina Diamond 2",
+                  "type": "apartment",
+                  "bedrooms": 2,
+                  "sizeSqft": 1100,
+                  "priceAed": 1650000,
+                  "annualRentAed": 118000,
+                  "grossYield": 0.0715,
+                  "pricePerSqft": 1500,
+                  "status": "available"
+                },
+                {
+                  "id": "21a641ec-60a8-5886-b8ec-7ae82baa48b8",
+                  "reference": "MBR-1002",
+                  "title": "Spacious 2BR in Princess Tower",
+                  "area": "Dubai Marina",
+                  "building": "Princess Tower",
+                  "type": "apartment",
+                  "bedrooms": 2,
+                  "sizeSqft": 1410,
+                  "priceAed": 1890000,
+                  "annualRentAed": 125000,
+                  "grossYield": 0.0661,
+                  "pricePerSqft": 1340,
+                  "status": "available"
+                },
+                {
                   "id": "bcb641ba-26bb-5bbc-8672-ba7a3c2edbff",
                   "reference": "MBR-1022",
                   "title": "2BR in Marina Quays West",
@@ -221,15 +265,16 @@
                   "status": "available"
                 }
               ],
-              "total": 2
+              "total": 4
             },
-            "durationMs": 3
+            "durationMs": 4
           }
         ],
-        "createdAt": "2026-10-31T03:36:01.988Z",
+        "createdAt": "2026-10-31T04:06:14.357Z",
         "parentRunId": null,
         "trigger": "analysis",
-        "reply": "Hi Sara, I found two matches. MBR-1001 (Marina Gate 1) is AED 2,050,000 with a 7.32% gross yield, and it is the stronger choice for a yield-focused buyer. MBR-1022 (Marina Quays West) is AED 2,099,000, but no rent is recorded, so its yield can't be stated. Both are available. I'd lead with MBR-1001 and get the rental estimate for MBR-1022 before showing it.",
+        "agentMessage": null,
+        "reply": "Hi Sara, here are three 2BR Dubai Marina options for this lead, ranked by yield: MBR-1001 (AED 2.05M, 7.32%), MBR-1007 (AED 1.65M, 7.15%) and MBR-1002 (AED 1.89M, 6.61%). All three are available. MBR-1022 (AED 2,099,000) also fits the budget, but its rental income isn't recorded, so I can't confirm its yield. You could check the expected rent with the owner before showing it.",
         "extraction": {
           "bedroomsRange": {
             "min": 2,
@@ -256,7 +301,7 @@
               "source": "536370e0-95b4-539e-943b-4a67509c0bea",
               "evidence": {
                 "sourceId": "536370e0-95b4-539e-943b-4a67509c0bea",
-                "quote": "2-bedroom apartment"
+                "quote": "2-bedroom"
               }
             },
             "budget": {
@@ -276,7 +321,7 @@
               "source": "536370e0-95b4-539e-943b-4a67509c0bea",
               "evidence": {
                 "sourceId": "536370e0-95b4-539e-943b-4a67509c0bea",
-                "quote": "2-bedroom apartment"
+                "quote": "apartment"
               }
             },
             "transaction": {
@@ -299,15 +344,31 @@
             ]
           }
         },
-        "steps": []
+        "steps": [
+          {
+            "step": "route",
+            "route": "search",
+            "trigger": "analysis"
+          },
+          {
+            "step": "recommendation_rejected",
+            "propertyId": "c6df63e6-cf34-5246-a932-498ce3585c12",
+            "reason": "price_low"
+          },
+          {
+            "step": "recommendation_rejected",
+            "propertyId": "21a641ec-60a8-5886-b8ec-7ae82baa48b8",
+            "reason": "price_low"
+          }
+        ]
       }
     },
     {
       "label": "createRun(310661c8-6de3-5b3f-80c8-ca4ef71e55b1)",
       "payload": {
-        "id": "5d2b19c9-8b65-4cbe-8fe5-e1bab7161201",
+        "id": "9830580f-2885-42e4-8157-87b2294a34ed",
         "leadId": "310661c8-6de3-5b3f-80c8-ca4ef71e55b1",
-        "messageId": "832d91ac-19f2-4f66-8c8c-593157febce4",
+        "messageId": "fa8c9997-dcb7-48c2-a96e-eb26172bf969",
         "status": "completed",
         "requirements": {
           "locations": [
@@ -327,7 +388,7 @@
         "recommendations": [
           {
             "propertyId": "473a131f-4f8c-52d5-88d5-88ac173f49ea",
-            "reason": "MBR-1001, Marina Gate 1: AED 2,050,000, gross yield 7.32% (annual rent AED 150,000), status available. It matches the budget and has the stronger yield of the two.",
+            "reason": "MBR-1001, a 2BR in Marina Gate 1, is available at AED 2,050,000. Its gross yield is 7.32% (annual rent AED 150,000), which fits the good-yield preference.",
             "property": {
               "reference": "MBR-1001",
               "title": "Marina-view 2BR in Marina Gate 1",
@@ -341,7 +402,7 @@
           },
           {
             "propertyId": "bcb641ba-26bb-5bbc-8672-ba7a3c2edbff",
-            "reason": "MBR-1022, Marina Quays West: AED 2,099,000, status available. It fits the brief, but no annual rent is on record, so its gross yield is unknown.",
+            "reason": "MBR-1022, a 2BR in Marina Quays West, is available at AED 2,099,000, just inside the AED 2.1M ceiling. Its annual rent and gross yield are not recorded, so its yield can't be confirmed.",
             "property": {
               "reference": "MBR-1022",
               "title": "2BR in Marina Quays West",
@@ -354,15 +415,15 @@
             }
           }
         ],
-        "summary": "Two available 2BR apartments in Dubai Marina are priced between AED 2.0M and AED 2.1M, which is the 'around AED 2M' budget with tolerance. MBR-1001 has a confirmed gross yield of 7.32%. MBR-1022 has no rent data, so its yield can't be confirmed.",
+        "summary": "Two available 2BR apartments in Dubai Marina are priced between AED 2.0M and AED 2.1M. MBR-1001 has a confirmed gross yield of 7.32%. MBR-1022 has no rent data, so its yield is unknown.",
         "proposedActions": [
           {
-            "id": "a196f318-131d-4cef-9f49-fa42a4d8821c",
+            "id": "3b1a2cd2-ff9e-45d6-acf8-af8616a3e5d9",
             "type": "create_follow_up_task",
             "status": "pending_approval",
             "task": {
               "title": "Send Dubai Marina 2BR options and confirm rent for MBR-1022",
-              "notes": "Share MBR-1001 (AED 2.05M, 7.32% gross yield) with the lead. Get the expected annual rent for MBR-1022 (AED 2.099M) so its yield can be compared.",
+              "notes": "Share MBR-1001 (AED 2.05M, 7.32% gross yield) with the lead. Find the expected annual rent for MBR-1022 (AED 2.099M) so its yield can be compared.",
               "dueAt": null
             },
             "needsClarification": "call me sometime next week"
@@ -419,13 +480,14 @@
               ],
               "total": 2
             },
-            "durationMs": 2
+            "durationMs": 4
           }
         ],
-        "createdAt": "2026-10-31T03:36:17.027Z",
+        "createdAt": "2026-10-31T04:06:28.551Z",
         "parentRunId": null,
         "trigger": "analysis",
-        "reply": "Hi Sara, two listings fit this lead. MBR-1001 (Marina Gate 1) is AED 2,050,000 with a 7.32% gross yield and is available. It's the best fit for the good-yield preference. MBR-1022 (Marina Quays West) is AED 2,099,000 and available, but it has no rent figure on file, so I can't state its yield. I'd lead with MBR-1001 and get the rental estimate for MBR-1022 before presenting it.",
+        "agentMessage": null,
+        "reply": "Hi Sara, two Dubai Marina 2BR apartments fit the lead's budget of around AED 2M. The stronger option for yield is MBR-1001 in Marina Gate 1, at AED 2,050,000 with a 7.32% gross yield and available status. MBR-1022 in Marina Quays West is available at AED 2,099,000, but it has no rent figure on file, so I can't state its yield. Check the likely rent for MBR-1022 before presenting it as a yield option.",
         "extraction": {
           "bedroomsRange": {
             "min": 2,
@@ -495,7 +557,13 @@
             ]
           }
         },
-        "steps": []
+        "steps": [
+          {
+            "step": "route",
+            "route": "search",
+            "trigger": "analysis"
+          }
+        ]
       }
     }
   ]

@@ -15,6 +15,9 @@ import { case9DateTomorrowKarim } from './cases/9-date-tomorrow-karim';
 import { case10DateAfterWeekendJames } from './cases/10-date-after-weekend-james';
 import { case11Isolation } from './cases/11-isolation';
 import { case12RentPriya } from './cases/12-rent-priya';
+import { case5cInjectionChatMbr1019 } from './cases/5c-injection-chat-mbr1019';
+import { case7bToolChoiceChat } from './cases/7b-tool-choice-chat';
+import { case13ChatNarrowing } from './cases/13-chat-narrowing';
 
 // Not mockable (see PLAN.md) -- every case below calls the real Anthropic API.
 const ALL_CASES: EvalCase[] = [
@@ -25,13 +28,16 @@ const ALL_CASES: EvalCase[] = [
   case4AmbiguousDate,
   case5aInjectionMessageAlex,
   case5bInjectionDescriptionMbr1019,
+  case5cInjectionChatMbr1019,
   case6ToolFailure,
   case7ToolChoice,
+  case7bToolChoiceChat,
   case8NoActionWithoutApproval,
   case9DateTomorrowKarim,
   case10DateAfterWeekendJames,
   case11Isolation,
   case12RentPriya,
+  case13ChatNarrowing,
 ];
 
 interface CaseResult {

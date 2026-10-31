@@ -79,14 +79,14 @@
         ],
         "total": 4
       },
-      "durationMs": 10
+      "durationMs": 8
     }
   ],
   "runs": [
     {
       "label": "createRun(310661c8-6de3-5b3f-80c8-ca4ef71e55b1)",
       "payload": {
-        "id": "153c8a05-21bf-4a96-a0f8-baa89f2c53f1",
+        "id": "75b8513d-ca19-4678-af7b-4640a18175ae",
         "leadId": "310661c8-6de3-5b3f-80c8-ca4ef71e55b1",
         "messageId": "536370e0-95b4-539e-943b-4a67509c0bea",
         "status": "completed",
@@ -108,7 +108,7 @@
         "recommendations": [
           {
             "propertyId": "473a131f-4f8c-52d5-88d5-88ac173f49ea",
-            "reason": "MBR-1001 is a 2BR in Marina Gate 1 priced at AED 2,050,000. Its gross yield is 7.32%, the highest of the matches, and it is available. The price is slightly above AED 2M, within the 'around' tolerance.",
+            "reason": "MBR-1001 in Marina Gate 1 is priced at AED 2,050,000 with a gross yield of 7.32%, the highest of the matches. Status is available. It is slightly above AED 2M but inside the 'around' ceiling.",
             "property": {
               "reference": "MBR-1001",
               "title": "Marina-view 2BR in Marina Gate 1",
@@ -122,7 +122,7 @@
           },
           {
             "propertyId": "c6df63e6-cf34-5246-a932-498ce3585c12",
-            "reason": "MBR-1007 is a 2BR in Marina Diamond 2 priced at AED 1,650,000. Its gross yield is 7.15% and it is available. It is well under budget and has the second-best yield.",
+            "reason": "MBR-1007 in Marina Diamond 2 is priced at AED 1,650,000 with a gross yield of 7.15%. Status is available. It is the lowest-priced option and well under budget.",
             "property": {
               "reference": "MBR-1007",
               "title": "Value 2BR in Marina Diamond 2",
@@ -136,7 +136,7 @@
           },
           {
             "propertyId": "21a641ec-60a8-5886-b8ec-7ae82baa48b8",
-            "reason": "MBR-1002 is a 2BR in Princess Tower priced at AED 1,890,000. Its gross yield is 6.61% and it is available. It is the largest unit at 1,410 sqft and is under AED 2M.",
+            "reason": "MBR-1002 in Princess Tower is priced at AED 1,890,000 with a gross yield of 6.61%. Status is available. It is the largest unit at 1,410 sqft.",
             "property": {
               "reference": "MBR-1002",
               "title": "Spacious 2BR in Princess Tower",
@@ -149,15 +149,15 @@
             }
           }
         ],
-        "summary": "Four available 2BR apartments in Dubai Marina are at or below AED 2.1M. Three have a known yield, and I recommended those, ranked by gross yield (7.32%, 7.15%, 6.61%). I left out MBR-1022 (AED 2,099,000) because it has no rent on record, so its yield can't be confirmed.",
+        "summary": "Four available 2BR Dubai Marina apartments are at or below AED 2.1M. Three have a known yield, ranging from 6.61% to 7.32%. MBR-1022 (AED 2,099,000) has no rent data, so its yield can't be confirmed and I left it out.",
         "proposedActions": [
           {
-            "id": "456b251b-e948-4200-be23-dfccd28aa94e",
+            "id": "b801743e-def9-47a7-94fa-61a3d59efdb2",
             "type": "create_follow_up_task",
             "status": "pending_approval",
             "task": {
-              "title": "Send Dubai Marina 2BR shortlist to lead and confirm viewings",
-              "notes": "Share MBR-1001, MBR-1007 and MBR-1002. Ask which the lead prefers and book viewings. Check the rental figure for MBR-1022 if the lead wants more options.",
+              "title": "Send lead 2BR Dubai Marina shortlist (MBR-1001, 1007, 1002)",
+              "notes": "Share the three options with their yields. Check the lead's preference between the higher yield of MBR-1001 and the lower price of MBR-1007. Get the annual rent figure for MBR-1022 if the lead wants it considered.",
               "dueAt": "2026-11-01T10:00:00+04:00"
             },
             "needsClarification": null
@@ -243,13 +243,14 @@
               ],
               "total": 4
             },
-            "durationMs": 10
+            "durationMs": 8
           }
         ],
-        "createdAt": "2026-10-31T03:34:18.522Z",
+        "createdAt": "2026-10-31T04:03:38.781Z",
         "parentRunId": null,
         "trigger": "analysis",
-        "reply": "Hi Sara, three available Dubai Marina 2BR apartments fit this lead's budget and yield preference. MBR-1001 (Marina Gate 1) is AED 2.05M at a 7.32% gross yield. MBR-1007 (Marina Diamond 2) is AED 1.65M at 7.15%. MBR-1002 (Princess Tower) is AED 1.89M at 6.61%. MBR-1022 (Marina Quays West, AED 2.099M) also fits the budget, but it has no rent figure listed, so I can't confirm its yield.",
+        "agentMessage": null,
+        "reply": "Hi Sara, I found three 2BR Dubai Marina apartments that suit a buyer wanting good yield at around AED 2M. MBR-1001 is AED 2.05M at 7.32% gross. MBR-1007 is AED 1.65M at 7.15%. MBR-1002 is AED 1.89M at 6.61%. All three are available. MBR-1022 is AED 2.099M, but it has no rental figure, so I can't confirm its yield. You could get the rent estimate if the lead wants it considered.",
         "extraction": {
           "bedroomsRange": {
             "min": 2,
@@ -296,7 +297,7 @@
               "source": "536370e0-95b4-539e-943b-4a67509c0bea",
               "evidence": {
                 "sourceId": "536370e0-95b4-539e-943b-4a67509c0bea",
-                "quote": "2-bedroom apartment"
+                "quote": "apartment"
               }
             },
             "transaction": {
@@ -319,7 +320,13 @@
             ]
           }
         },
-        "steps": []
+        "steps": [
+          {
+            "step": "route",
+            "route": "search",
+            "trigger": "analysis"
+          }
+        ]
       }
     }
   ]

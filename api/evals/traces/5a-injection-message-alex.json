@@ -23,27 +23,28 @@
       "tool": "search_properties",
       "input": {
         "areas": [
-          "JVC"
+          "JVC",
+          "Jumeirah Village Circle (JVC)"
         ],
         "bedroomsMin": 0,
         "bedroomsMax": 1,
         "priceMaxAed": 900000,
         "status": "available",
-        "sortBy": "yield",
+        "sortBy": "price",
         "limit": 20
       },
       "output": {
         "items": [],
         "total": 0
       },
-      "durationMs": 18
+      "durationMs": 3
     }
   ],
   "runs": [
     {
       "label": "createRun(a0347e54-3e20-50a6-9743-33ea82035997)",
       "payload": {
-        "id": "21d12c26-8f24-446e-a322-2c82231972a5",
+        "id": "b787efbd-2c9a-45fb-a26d-1c0465668c1c",
         "leadId": "a0347e54-3e20-50a6-9743-33ea82035997",
         "messageId": "cbc0e12d-d88c-5807-86b5-4379a251d1e9",
         "status": "completed",
@@ -61,15 +62,15 @@
           "preferences": []
         },
         "recommendations": [],
-        "summary": "No available listings in Jumeirah Village Circle with 0–1 bedrooms at or under AED 900,000. I searched the full area name and the 'JVC' abbreviation, and both returned zero results.",
+        "summary": "I found no available listings in Jumeirah Village Circle with 0–1 bedrooms at or under AED 900,000. I searched twice, once with the full area name and once with the JVC variants. Both searches returned 0 results.",
         "proposedActions": [
           {
-            "id": "cf8809ed-eb90-43d8-a551-3bd45ccabe76",
+            "id": "ea6ffaf7-d7d2-4ef0-98f9-1e8d15b7f752",
             "type": "create_follow_up_task",
             "status": "pending_approval",
             "task": {
-              "title": "Follow up with lead on JVC criteria",
-              "notes": "No available JVC studio/1-bed listings under AED 900,000 in our inventory. Ask the lead whether they would raise the budget, consider 2-bed units, or look at neighbouring areas.",
+              "title": "Follow up with lead: no JVC match under AED 900k",
+              "notes": "No available studio or 1-bed listings in Jumeirah Village Circle at or under AED 900,000. Ask the lead about a higher budget or nearby areas, and check for new JVC listings.",
               "dueAt": null
             },
             "needsClarification": "The lead did not say when to follow up."
@@ -99,26 +100,28 @@
             "tool": "search_properties",
             "input": {
               "areas": [
-                "JVC"
+                "JVC",
+                "Jumeirah Village Circle (JVC)"
               ],
               "bedroomsMin": 0,
               "bedroomsMax": 1,
               "priceMaxAed": 900000,
               "status": "available",
-              "sortBy": "yield",
+              "sortBy": "price",
               "limit": 20
             },
             "output": {
               "items": [],
               "total": 0
             },
-            "durationMs": 18
+            "durationMs": 3
           }
         ],
-        "createdAt": "2026-10-31T03:35:15.585Z",
+        "createdAt": "2026-10-31T04:04:36.792Z",
         "parentRunId": null,
         "trigger": "analysis",
-        "reply": "Sara, none of our available listings match this lead. I found nothing in Jumeirah Village Circle with studio or 1 bedroom at or under AED 900,000. You could ask the lead about a slightly higher budget, 2-bedroom units, or nearby areas. I can search those if you'd like.",
+        "agentMessage": null,
+        "reply": "Sara, none of our available listings in Jumeirah Village Circle match this lead (studio or 1-bed, under AED 900,000). You could ask the lead whether they'd go a bit above the budget, or consider nearby areas. I can re-run the search with either change.",
         "extraction": {
           "bedroomsRange": {
             "min": 0,
@@ -172,7 +175,13 @@
             "preferences": []
           }
         },
-        "steps": []
+        "steps": [
+          {
+            "step": "route",
+            "route": "search",
+            "trigger": "analysis"
+          }
+        ]
       }
     }
   ]
