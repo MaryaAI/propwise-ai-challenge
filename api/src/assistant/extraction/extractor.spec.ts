@@ -1,7 +1,7 @@
 import { MockLanguageModelV3 } from 'ai/test';
 import { Extraction } from './extraction.schema';
 import { ExtractionFailedError, Extractor } from './extractor';
-import { ConversationMessage } from './prompts';
+import { AGENT_INSTRUCTION_SOURCE_ID, ConversationMessage } from './prompts';
 
 function usage() {
   return {
@@ -99,6 +99,50 @@ describe('Extractor', () => {
 
     expect(result.update.propertyType).toBeUndefined();
     expect(result.rejected).toContainEqual({ field: 'propertyType', reason: 'evidence quote not found in the cited message' });
+  });
+
+  describe("the agent's own chat turn as an evidence source", () => {
+    const NARROW = 'Only show options under 1.9M';
+
+    function narrowingExtraction(sourceId: string) {
+      const extraction = karimExtraction();
+      extraction.budget = {
+        value: { minAed: null, maxAed: 1_900_000, qualifier: 'under' },
+        evidence: { sourceId, quote: 'under 1.9M' },
+        status: 'stated',
+      };
+      return extraction;
+    }
+
+    it('accepts a field the agent stated, quoted from the instruction', async () => {
+      const extractor = extractorWith(textResult(narrowingExtraction(AGENT_INSTRUCTION_SOURCE_ID)));
+
+      const result = await extractor.extract({ ...BASE_INPUT, agentInstruction: NARROW });
+
+      expect(result.update.budget?.value).toEqual({ minAed: null, maxAed: 1_900_000, qualifier: 'under' });
+      expect(result.update.budget?.source).toBe(AGENT_INSTRUCTION_SOURCE_ID);
+      expect(result.rejected).toEqual([]);
+    });
+
+    it('still checks the quote really is in the instruction', async () => {
+      const extraction = narrowingExtraction(AGENT_INSTRUCTION_SOURCE_ID);
+      extraction.budget.evidence.quote = 'under 1.2M';
+      const extractor = extractorWith(textResult(extraction));
+
+      const result = await extractor.extract({ ...BASE_INPUT, agentInstruction: NARROW });
+
+      expect(result.update.budget).toBeUndefined();
+      expect(result.rejected).toContainEqual({ field: 'budget', reason: 'evidence quote not found in the cited message' });
+    });
+
+    it('rejects the synthetic source on an analysis run, where no instruction exists', async () => {
+      const extractor = extractorWith(textResult(narrowingExtraction(AGENT_INSTRUCTION_SOURCE_ID)));
+
+      const result = await extractor.extract(BASE_INPUT);
+
+      expect(result.update.budget).toBeUndefined();
+      expect(result.rejected).toContainEqual({ field: 'budget', reason: 'evidence quote not found in the cited message' });
+    });
   });
 
   it('excludes a location that is not one of the agency areas, even with valid evidence', async () => {

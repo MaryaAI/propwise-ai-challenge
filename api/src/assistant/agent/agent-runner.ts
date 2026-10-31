@@ -3,7 +3,7 @@ import { generateText, NoObjectGeneratedError, NoOutputGeneratedError, Output, s
 import { AssistantModelFactory, ASSISTANT_MODEL_FACTORY } from '../model';
 import { AgentRequirementsBrief } from '../types';
 import { FinalOutput, FinalSchema } from './final-schema';
-import { buildAgentSystemPrompt, buildAgentUserPrompt } from './prompts';
+import { AgentMode, buildAgentSystemPrompt, buildAgentUserPrompt } from './prompts';
 import { createTrace, Trace } from './tracing';
 import { ToolsFactory } from './tools';
 
@@ -30,6 +30,13 @@ export class AgentRunner {
     agencyName: string;
     agentName: string;
     requirements: AgentRequirementsBrief;
+    /** 'search' looks for new listings; 'property_question' answers about known ones. */
+    mode?: AgentMode;
+    /** The agent's own chat turn: a trusted instruction, unlike a lead's message. */
+    agentInstruction?: string;
+    history?: { agentMessage: string; reply: string }[];
+    previousRecommendationIds?: string[];
+    propertyRefs?: string[];
     abortSignal?: AbortSignal;
   }): Promise<AgentRunResult> {
     const abortController = new AbortController();
@@ -44,8 +51,14 @@ export class AgentRunner {
     try {
       const result = await generateText({
         model: this.modelFactory(),
-        system: buildAgentSystemPrompt(input),
-        prompt: buildAgentUserPrompt({ requirements: input.requirements }),
+        system: buildAgentSystemPrompt({ ...input, mode: input.mode ?? 'search' }),
+        prompt: buildAgentUserPrompt({
+          requirements: input.requirements,
+          agentInstruction: input.agentInstruction,
+          history: input.history,
+          previousRecommendationIds: input.previousRecommendationIds,
+          propertyRefs: input.propertyRefs,
+        }),
         tools,
         stopWhen: stepCountIs(8),
         output: Output.object({ schema: FinalSchema }),

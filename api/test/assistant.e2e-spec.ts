@@ -356,6 +356,158 @@ describe('Assistant routes (against the test database, mocked model)', () => {
     });
   });
 
+  describe('chat turns on an existing run', () => {
+    /** A property_question chat turn makes TWO model calls: the extraction and the agent. */
+    function scriptChatTurn() {
+      scripted.push(
+        textResult(minimalExtraction({ intent: 'property_question' })),
+        textResult({ recommendations: [], summary: 'Service charge is 15/sqft.', reply: 'It is 15 AED per sqft.', followUpTask: null }),
+      );
+    }
+
+    it('creates a NEW run with parentRunId, trigger chat, and the agent message', async () => {
+      const token = await login('sara@marinabay.test');
+      const { runId } = await createClarifyRun(token);
+      scriptChatTurn();
+
+      const response = await request(app.getHttpServer())
+        .post(`/leads/${HASSAN}/assistant/runs/${runId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'What is the service charge on MBR-1001?' })
+        .expect(201);
+
+      expect(response.body.id).not.toBe(runId);
+      expect(response.body.parentRunId).toBe(runId);
+      expect(response.body.trigger).toBe('chat');
+      expect(response.body.agentMessage).toBe('What is the service charge on MBR-1001?');
+      expect(response.body.status).toBe('completed');
+      // The parent run is never mutated.
+      const parent = await request(app.getHttpServer())
+        .get(`/leads/${HASSAN}/assistant/runs/${runId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(parent.body.trigger).toBe('analysis');
+      expect(parent.body.agentMessage).toBeNull();
+    });
+
+    it('creates no Message row on the lead and no task', async () => {
+      const token = await login('sara@marinabay.test');
+      const { runId } = await createClarifyRun(token);
+      const before = await request(app.getHttpServer()).get(`/leads/${HASSAN}`).set('Authorization', `Bearer ${token}`).expect(200);
+      const tasksBefore = await request(app.getHttpServer()).get(`/leads/${HASSAN}/tasks`).set('Authorization', `Bearer ${token}`).expect(200);
+      scriptChatTurn();
+
+      await request(app.getHttpServer())
+        .post(`/leads/${HASSAN}/assistant/runs/${runId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'Anything else in the Marina?' })
+        .expect(201);
+
+      const after = await request(app.getHttpServer()).get(`/leads/${HASSAN}`).set('Authorization', `Bearer ${token}`).expect(200);
+      const tasksAfter = await request(app.getHttpServer()).get(`/leads/${HASSAN}/tasks`).set('Authorization', `Bearer ${token}`).expect(200);
+      expect(after.body.messages.length).toBe(before.body.messages.length);
+      expect(tasksAfter.body.length).toBe(tasksBefore.body.length);
+    });
+
+    it('reuses the parent run analysed message id', async () => {
+      const token = await login('sara@marinabay.test');
+      const { runId } = await createClarifyRun(token);
+      const parent = await request(app.getHttpServer())
+        .get(`/leads/${HASSAN}/assistant/runs/${runId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      scriptChatTurn();
+
+      const response = await request(app.getHttpServer())
+        .post(`/leads/${HASSAN}/assistant/runs/${runId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'And the yield?' })
+        .expect(201);
+
+      expect(response.body.messageId).toBe(parent.body.messageId);
+    });
+
+    it('400s on empty content, and on content over 2000 characters', async () => {
+      const token = await login('sara@marinabay.test');
+      const { runId } = await createClarifyRun(token);
+
+      await request(app.getHttpServer())
+        .post(`/leads/${HASSAN}/assistant/runs/${runId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: '' })
+        .expect(400);
+      await request(app.getHttpServer())
+        .post(`/leads/${HASSAN}/assistant/runs/${runId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'x'.repeat(2001) })
+        .expect(400);
+    });
+
+    it('404s when the parent run belongs to a different lead', async () => {
+      const token = await login('sara@marinabay.test');
+      const { runId } = await createClarifyRun(token);
+
+      await request(app.getHttpServer())
+        .post(`/leads/${KARIM}/assistant/runs/${runId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'hello' })
+        .expect(404);
+    });
+
+    it("404s on another agency's run", async () => {
+      const saraToken = await login('sara@marinabay.test');
+      const omarToken = await login('omar@desertkey.test');
+      const { runId } = await createClarifyRun(saraToken);
+
+      await request(app.getHttpServer())
+        .post(`/leads/${HASSAN}/assistant/runs/${runId}/messages`)
+        .set('Authorization', `Bearer ${omarToken}`)
+        .send({ content: 'hello' })
+        .expect(404);
+    });
+  });
+
+  describe('GET the run history', () => {
+    it('returns items newest first with a total, scoped to the lead', async () => {
+      const token = await login('sara@marinabay.test');
+      const first = await createClarifyRun(token);
+      const second = await createClarifyRun(token);
+
+      const response = await request(app.getHttpServer())
+        .get(`/leads/${HASSAN}/assistant/runs`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(typeof response.body.total).toBe('number');
+      expect(response.body.items.length).toBeGreaterThanOrEqual(2);
+      const ids = response.body.items.map((r: { id: string }) => r.id);
+      expect(ids.indexOf(second.runId)).toBeLessThan(ids.indexOf(first.runId));
+      // dueAt must carry the agent's +04:00 offset, not the process zone, even under TZ=UTC.
+      const withDue = response.body.items.find((r: { proposedActions: { task: { dueAt: string | null } }[] }) => r.proposedActions[0]?.task.dueAt);
+      if (withDue) expect(withDue.proposedActions[0].task.dueAt).toContain('+04:00');
+    });
+
+    it('honours limit and rejects an out-of-range one', async () => {
+      const token = await login('sara@marinabay.test');
+      await createClarifyRun(token);
+      await createClarifyRun(token);
+
+      const limited = await request(app.getHttpServer())
+        .get(`/leads/${HASSAN}/assistant/runs?limit=1`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(limited.body.items).toHaveLength(1);
+
+      await request(app.getHttpServer()).get(`/leads/${HASSAN}/assistant/runs?limit=0`).set('Authorization', `Bearer ${token}`).expect(400);
+      await request(app.getHttpServer()).get(`/leads/${HASSAN}/assistant/runs?limit=99`).set('Authorization', `Bearer ${token}`).expect(400);
+    });
+
+    it("404s on another agency's lead", async () => {
+      const token = await login('sara@marinabay.test');
+      await request(app.getHttpServer()).get(`/leads/${NADIA}/assistant/runs`).set('Authorization', `Bearer ${token}`).expect(404);
+    });
+  });
+
   describe('failure handling', () => {
     it('a model that never produces a valid extraction yields the literal failed-run shape', async () => {
       scripted.push(textResult({ not: 'valid' }), textResult({ still: 'not valid' }));

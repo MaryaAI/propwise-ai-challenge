@@ -31,6 +31,7 @@ export function toAssistantRunDto(run: AssistantRun, actions: AssistantAction[],
 
     parentRunId: run.parentRun?.id ?? null,
     trigger: run.trigger,
+    agentMessage: run.agentMessage ?? null,
     reply: run.reply,
     extraction: run.extraction,
     steps: run.steps,

@@ -4,7 +4,13 @@ import { AssistantModelFactory, ASSISTANT_MODEL_FACTORY } from '../model';
 import { Evidence, FollowUpTiming, RequirementsState, Sourced } from '../types';
 import { amountMatchesEvidence, quoteExists } from './normalize';
 import { Extraction, ExtractionSchema } from './extraction.schema';
-import { buildExtractionRepairPrompt, buildExtractionSystemPrompt, buildExtractionUserPrompt, ConversationMessage } from './prompts';
+import {
+  AGENT_INSTRUCTION_SOURCE_ID,
+  buildExtractionRepairPrompt,
+  buildExtractionSystemPrompt,
+  buildExtractionUserPrompt,
+  ConversationMessage,
+} from './prompts';
 
 export class ExtractionFailedError extends Error {}
 
@@ -37,6 +43,10 @@ export class Extractor {
     areas: string[];
     conversation: ConversationMessage[];
     analysedMessageId: string;
+    /** The agent's own chat turn, when this is a chat run. */
+    agentInstruction?: string;
+    /** The parent run's requirements, shown so a chat turn only states what changed. */
+    currentRequirements?: unknown;
     abortSignal?: AbortSignal;
   }): Promise<ExtractionResult> {
     const system = buildExtractionSystemPrompt();
@@ -67,16 +77,24 @@ export class Extractor {
     }
   }
 
-  private validate(raw: Extraction, input: { conversation: ConversationMessage[]; areas: string[] }): ExtractionResult {
+  private validate(
+    raw: Extraction,
+    input: { conversation: ConversationMessage[]; areas: string[]; agentInstruction?: string },
+  ): ExtractionResult {
     const rejected: RejectedField[] = [];
-    const sourceById = new Map(input.conversation.map((m) => [m.id, m]));
+    const sourceById = new Map(input.conversation.map((m) => [m.id, m.body]));
+    // The agent's own chat turn is a legal evidence source too (architecture section 3.3), under a
+    // synthetic id since it has no Message row. Quotes from it are verified the same way.
+    if (input.agentInstruction !== undefined) {
+      sourceById.set(AGENT_INSTRUCTION_SOURCE_ID, input.agentInstruction);
+    }
     const areaByLower = new Map(input.areas.map((a) => [a.toLowerCase(), a]));
 
     const hasValidEvidence = (field: ExtractionField<unknown>): boolean => {
       if (field.status !== 'stated') return false;
       const source = sourceById.get(field.evidence.sourceId);
-      if (!source) return false;
-      return quoteExists(field.evidence.quote, source.body);
+      if (source === undefined) return false;
+      return quoteExists(field.evidence.quote, source);
     };
 
     const update: Partial<RequirementsState> = {};
@@ -129,7 +147,7 @@ export class Extractor {
     const preferences: Sourced<string>[] = [];
     for (const pref of raw.preferences) {
       const source = sourceById.get(pref.evidence.sourceId);
-      if (!source || !quoteExists(pref.evidence.quote, source.body)) {
+      if (source === undefined || !quoteExists(pref.evidence.quote, source)) {
         rejected.push({ field: 'preferences', reason: `evidence for "${pref.text}" not found in the cited message` });
         continue;
       }

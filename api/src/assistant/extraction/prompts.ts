@@ -5,6 +5,13 @@ export interface ConversationMessage {
   body: string;
 }
 
+/**
+ * The evidence `sourceId` for the agent's own chat turn. A chat turn creates no `Message` row, so
+ * it has no real id -- but architecture section 3.3 makes Sara's message a legal evidence source
+ * alongside the conversation, and without one every field she states would be rejected.
+ */
+export const AGENT_INSTRUCTION_SOURCE_ID = 'agent-instruction';
+
 export function buildExtractionSystemPrompt(): string {
   return [
     "You extract a real-estate lead's requirements for an agent.",
@@ -28,13 +35,31 @@ export function buildExtractionUserPrompt(input: {
   areas: string[];
   conversation: ConversationMessage[];
   analysedMessageId: string;
+  /** The agent's own chat turn, when this is a chat run. Trusted instruction, not lead data. */
+  agentInstruction?: string;
+  /** The parent run's requirements, so a chat turn only has to state what changed. */
+  currentRequirements?: unknown;
 }): string {
   const areasBlock = `<areas>${input.areas.join(' | ')}</areas>`;
   const conversationBlock = `<conversation>\n${input.conversation
     .map((m) => `<lead_message id="${m.id}" direction="${m.direction}" sentAt="${m.sentAt}">${m.body}</lead_message>`)
     .join('\n')}\n</conversation>`;
   const analysedBlock = `<analysed_message id="${input.analysedMessageId}"/>`;
-  return `You are extracting requirements for an agent at ${input.agencyName}.\n${areasBlock}\n${conversationBlock}\n${analysedBlock}`;
+
+  const blocks = [`You are extracting requirements for an agent at ${input.agencyName}.`, areasBlock, conversationBlock, analysedBlock];
+
+  if (input.currentRequirements !== undefined) {
+    blocks.push(`<current_requirements>${JSON.stringify(input.currentRequirements)}</current_requirements>`);
+  }
+  if (input.agentInstruction !== undefined) {
+    // Deliberately OUTSIDE the data tags: the lead's words are data, the agent's are an
+    // instruction. Quote it with sourceId "agent-instruction" when it states a field.
+    blocks.push(
+      `The agent has sent you the instruction below (trusted, id="${AGENT_INSTRUCTION_SOURCE_ID}"). Only the fields it states should change; leave every other field exactly as it is in <current_requirements>, with status "missing".`,
+      `Agent instruction: ${input.agentInstruction}`,
+    );
+  }
+  return blocks.join('\n');
 }
 
 export function buildExtractionRepairPrompt(originalPrompt: string, cause: string): string {

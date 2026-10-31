@@ -29,6 +29,18 @@ export function clarifyTemplate(leadName: string): TemplateOutput {
   };
 }
 
+/**
+ * The `change_follow_up` route (architecture section 2): the agent asked to move the appointment,
+ * so a new task with the new date is proposed and no model call is needed.
+ */
+export function changeFollowUpTemplate(leadName: string): TemplateOutput {
+  return {
+    summary: `The follow-up with ${leadName} has been rescheduled.`,
+    reply: `I have drafted a follow-up with ${leadName} for the new time. Approve it to add it to your tasks.`,
+    followUpTask: { title: `Follow up with ${leadName}`, notes: null },
+  };
+}
+
 export function closedTemplate(leadName: string): TemplateOutput {
   return {
     summary: `${leadName} is no longer interested.`,
