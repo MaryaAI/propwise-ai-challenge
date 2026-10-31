@@ -20,6 +20,8 @@ export const case10DateAfterWeekendJames: EvalCase = {
     assertCompleted(run);
     assert.strictEqual(run.proposedActions.length, 1);
     assert.strictEqual(run.proposedActions[0].task.dueAt, expected.dueAt);
+    // "up to 1.5M" is a purchase-scale budget, so this must not drift to 'rent'.
+    assert.strictEqual(run.requirements.intent, 'buy');
     assert.ok(run.requirements.locations.includes('Jumeirah Lake Towers'), `expected JLT in ${JSON.stringify(run.requirements.locations)}`);
     assert.ok(run.requirements.locations.includes('Dubai Marina'), `expected Dubai Marina in ${JSON.stringify(run.requirements.locations)}`);
 
