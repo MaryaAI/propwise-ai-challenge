@@ -80,18 +80,18 @@ Done when: analyze → approve → task appears in Tasks on web, and mobile show
 - [x] Web: `api.ts` → `ActionCard` (+ Vitest test) → `RunCard` (+ test) → `AssistantPanel` (load latest run, analyze, chat) → `onTaskCreated` wired into the lead page
 - [~] Manual check against a live `TZ=UTC pnpm dev:api`: the panel's mount call, the 404/400 error paths and the failed-run shape all verified; **`analyze → approve → task appears` still owed** — it needs one live model call and the key returns `invalid x-api-key` (see A17)
 - [x] Mobile: `api.ts` → `RunCard`/`ActionCard` → `AssistantPanel` (no chat, per the cut line); **Expo Go run still owed**, same blocker
-- [x] `pnpm -C web test` (19) and `pnpm -C mobile test` (8) green, then commit
+- [x] `pnpm -C web test` (27) and `pnpm -C mobile test` (16) green, then commit
 
 ## Phase 8 — Closing (15 min)
 
 Done when: the delivery checklist (TASK.md's "When time is up") is complete.
 
-- [ ] Independent review in a fresh AI session against `TASK.md`
-- [ ] Fix genuine violations found
-- [ ] `NOTES.md`
-- [ ] `pnpm db:reset` → `pnpm -C api eval` → `pnpm check`
-- [ ] `TZ=UTC pnpm dev:api` smoke test
-- [ ] Final commit, `git status` clean
+- [x] Independent review against `TASK.md` by a pass with no prior context (see A18)
+- [x] Fix genuine violations found — the `closed` injection hole, and the undisclosed budget ceiling
+- [x] `NOTES.md`
+- [~] `pnpm db:reset` → `pnpm check` green; **`pnpm -C api eval` not re-run** — `invalid x-api-key`, and running it would overwrite the committed 17/17 with an auth-failure 0/17 (A16)
+- [x] `TZ=UTC pnpm dev:api` smoke test
+- [x] Final commit, `git status` clean, `phase-6-chat` merged into `main`
 
 ## Cut line (in order, if time runs short)
 
@@ -129,6 +129,10 @@ Done when: the delivery checklist (TASK.md's "When time is up") is complete.
 - **A11 — two real bugs found finishing Phase 3/4:**
   - `AgentRunner`'s 3b catch block discarded the trace on every failure path, even though architecture section 3.8 explicitly requires trace/steps to survive a failed run for diagnosis. Fixed: `AgentFailedError` now carries the trace, and any other rethrown error (`ToolInfraError`, an abort) gets `.trace` attached generically before leaving `AgentRunner.run()`, so `assistant.service.ts`'s failure path can still persist whatever tool calls happened before the failure.
   - `AssistantController`'s `approve`/`reject` routes returned `201 Created` instead of the contract's `200` — Nest's `@Post()` defaults to 201 unless told otherwise. Caught immediately by the new e2e spec (4 failing assertions, all `expected 200, got 201`); fixed with `@HttpCode(200)` on both routes.
+- **A18 — the closing compliance audit (Phase 8):** an independent pass with no prior context went through `TASK.md` requirement by requirement against the code rather than the documentation. It confirmed what matters most — agency scoping complete across all 23 query sites in `api/src/assistant`, no model-reachable write (exactly two `tool()` definitions, both pure `SELECT`), the contract matching field for field including the literal failed-run shape, and the whole diff outside the assistant module being **13 added lines, 0 removed** with `seed/*.json` byte-identical. Two findings were fixed:
+  - **`closed` was the one genuine injection hole.** It reached the router ungated while every other decision input was evidence-checked, so text that persuaded the model to set it sent the run to the `closed` route — no follow-up proposed, and a summary saying the lead is no longer interested. Now evidence-gated like the rest, with the rejection recorded in `steps`. `intent` is deliberately left ungated: it is a routing classification, not a claim about the lead, and cannot suppress the action alone.
+  - **The matching ceiling was undisclosed.** `budgetAed.max` reports what the lead said (2,000,000 for "around 2M") while matching runs to 2,100,000, so a recommendation can sit above the budget in the same payload. `budgetAed` stays literal — that is what "what was understood" means — and the real ceiling is now exposed as `extraction.budgetEffectiveMaxAed` with a `budget_tolerance` entry in `steps`. It goes in `extraction` rather than inside `budgetAed` because adding a key to an existing contract field would change its shape, which TASK.md forbids.
+  - Everything else it found is recorded in `NOTES.md`'s "what is weak or missing" rather than fixed: the unchallenged `budget.minAed`, `firstInfraError()` never being called, `recordInputError` being unwired, case 5b passing vacuously, the two tautological date cases, the unescaped prompt interpolation, and the unreachable `other_agency` guardrail. Each is a real weakness and each is written down.
 - **A17 — Phase 7 decisions:**
   - **The UI shows exactly one proposal, found by scanning the run chain newest-first.** Decision 10 says "the UI shows the latest run's proposal", but A15 means a `property_question` chat turn has `proposedActions: []` while a still-pending action lives on an *ancestor* run — so taken literally, decision 10 would hide the only approvable action. The panel therefore renders `items[0]` for its *content* and searches the run list newest-to-oldest for the first `pending_approval` action. This honours decision 10's intent (one proposal, never one per run) and A15's reality. `GET /runs?limit=20` already returns runs newest-first with `proposedActions` re-read live, so it costs one request and no new endpoint. The contract has no "superseded" status and none may be added, which makes the UI the only place a double-approval can be prevented; `ActionCard` also hides its buttons once an action is decided.
   - **Two rendering traps caught by reviewing the plan against committed data, both now covered by tests.** `grossYield` arrives as an **unrounded ratio** (`0.07317073170731707` in `traces/2-matching-karim.json`) because the snapshot uses `guardrails.grossYield()`, which does not round, rather than `property-query`'s 4-dp value — so it renders as `(x * 100).toFixed(1)` → "7.3%", and "Yield unavailable" when `null`. And `bedrooms: 0` is a studio *and* falsy, so a truthy check would label a studio "Any"; both `requirements.bedrooms` and `property.bedrooms` use an explicit `=== null` test.

@@ -49,7 +49,32 @@ The mobile app calls the API on the computer that serves it, on port 3001. If yo
 | `pnpm -C api test:e2e` | API end-to-end tests (`test/*.e2e-spec.ts`), against a separate `challenge_test` database that is reset first. |
 | `pnpm -C web test` | Web component tests (Vitest + Testing Library). |
 | `pnpm -C mobile test` | Mobile component tests (jest-expo + Testing Library). |
+| `pnpm -C api eval` | The AI assistant's eval suite against the real model. Resets the test database itself, writes `api/evals/REPORT.md` and a trace per case. `--case <name>` runs one. Needs a working `ANTHROPIC_API_KEY`. |
 | `pnpm check` | Type checks and all tests in all three apps. |
+
+## The AI assistant
+
+Built on top of the CRM above: it reads a lead's message, works out what they want, recommends
+listings from the agent's own agency, and drafts a follow-up task that is only saved once the agent
+approves it. See [NOTES.md](NOTES.md) for the decisions, the known weaknesses, and how to run it.
+
+The model reads language; code decides every fact and owns the only write. It has two read-only
+tools (`search_properties`, `get_property`) and no write tool, the agency id lives in a closure
+rather than a tool parameter, and every recommendation is re-checked against the database before it
+is returned.
+
+```
+POST   /leads/:leadId/assistant/runs                 analyse a message -> 201 AssistantRun
+GET    /leads/:leadId/assistant/runs/:runId          one run
+GET    /leads/:leadId/assistant/runs?limit=20        the run history, newest first
+POST   /leads/:leadId/assistant/runs/:runId/messages a follow-up chat turn -> a new run
+POST   .../runs/:runId/actions/:actionId/approve     the only path that creates a task
+POST   .../runs/:runId/actions/:actionId/reject      saves nothing
+```
+
+In the UI it is the "AI assistant" panel on the web lead page and the card on the mobile lead
+screen. Start the API in UTC (`TZ=UTC pnpm dev:api`) — all times are rendered in the agent's
+`Asia/Dubai` timezone, so running the API in a different zone is the interesting case.
 
 ## How it's put together
 
@@ -64,9 +89,9 @@ api/      NestJS 11 + MikroORM 6 + Postgres 16
   src/db/             migrations, seed, reset
   test/               end-to-end tests
 web/      Next.js 15 (App Router) + Tailwind
-  src/app/leads/[id]/page.tsx    the lead page, with the empty "AI assistant" panel
+  src/app/leads/[id]/page.tsx    the lead page, with the "AI assistant" panel
 mobile/   Expo SDK 57 + Expo Router
-  src/app/leads/[id].tsx         the lead screen, with the empty "AI assistant" card
+  src/app/leads/[id].tsx         the lead screen, with the "AI assistant" card
 seed/     the seed data, as JSON
 ```
 
