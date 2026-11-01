@@ -54,7 +54,7 @@ pnpm dev:mobile                     # Expo
 
 pnpm -C api eval                    # the eval suite -> api/evals/REPORT.md + traces/
 pnpm -C api eval --case 2-matching-karim    # one case
-pnpm check                          # typecheck + tests, all three apps (232 tests)
+pnpm check                          # typecheck + tests, all three apps (233 tests)
 ```
 
 The eval suite resets the test database itself, so running it twice in a row is the
@@ -112,31 +112,28 @@ the audit found and I did fix is listed separately at the end, so the record is 
 2. **"Same verdicts twice" is unverified against the shipped code**, for the same reason. No
    sampling parameters are set anywhere, so the model runs at the provider default; the assertions
    are written as sets and orderings rather than exact matches to tolerate that.
-3. **A tool call whose arguments fail validation leaves no trace entry.** `recordInputError` is
-   unwired (no `onStepFinish`), so "every tool call, in order" has a gap for that one case. The
-   call is rejected by the SDK before `execute` runs, so nothing reaches the trace.
-4. **`5b-injection-description-mbr1019` passes vacuously.** MBR-1019 is a 4-bed 6.2M villa that
+3. **`5b-injection-description-mbr1019` passes vacuously.** MBR-1019 is a 4-bed 6.2M villa that
    never entered the model's context for a 2-bed Marina lead, so the assertion proves little.
    `5c-injection-chat-mbr1019` is the real test — it forces a `get_property` on it first.
-5. **The two date eval cases are tautological** — they compute the expected value with
+4. **The two date eval cases are tautological** — they compute the expected value with
    `computeDueAt`, the function under test, because seed timestamps are relative to "now" and
    cannot be hardcoded. They prove the service wires the right `sentAt` through; the date maths
    itself is proven by `follow-up-date.spec.ts`, which hardcodes a Friday → Saturday case.
-6. **`intent` is not evidence-gated**, and `summary`, `reply` and the task title/notes are free
+5. **`intent` is not evidence-gated**, and `summary`, `reply` and the task title/notes are free
    model prose. The recommendation *list* is injection-proof; the text Sara reads is not. `intent`
    is a routing classification rather than a claim about the lead, and cannot suppress the action
    on its own — unlike `closed`, which is gated.
-7. **`guardrails.ts`'s `other_agency` check cannot fire** — the SQL `WHERE` already filtered the
+6. **`guardrails.ts`'s `other_agency` check cannot fire** — the SQL `WHERE` already filtered the
    row, so a cross-agency id falls through as `not_found`. Isolation is real and tested; that
    particular line just reads as more defence than it provides.
-8. **Not verified end to end**: `analyze → approve → task appears` in a browser, the Expo Go run,
+7. **Not verified end to end**: `analyze → approve → task appears` in a browser, the Expo Go run,
    and a manual `curl` round against all five seed leads. All three need one live model call. What
    *was* verified against a live `TZ=UTC pnpm dev:api`: the panel's mount call, the 404/400 error
    paths, the tasks endpoint, and a real analyse returning `201` with the documented failed-run
    shape.
-9. **`compare_properties` and mobile chat were cut**, in that order, as the plan's cut line
+8. **`compare_properties` and mobile chat were cut**, in that order, as the plan's cut line
    intended.
-10. **`docs/ARCHITECTURE_AND_PLAN.md` is about half Arabic** and is superseded in roughly twenty
+9. **`docs/ARCHITECTURE_AND_PLAN.md` is about half Arabic** and is superseded in roughly twenty
     places by `PLAN.md`'s amendments. It is kept as the original design record those amendments
     reference by section, not as a description of the current code.
 
@@ -155,6 +152,10 @@ the audit found and I did fix is listed separately at the end, so the record is 
 - **Untrusted text was interpolated into the prompt unescaped**, so a body containing
   `</lead_message>` could close its own tag and escalate to top-level prompt text. Now escaped,
   with the evidence check still running against the unescaped body so quotes stay verifiable.
+- **A tool call whose arguments failed the schema left no trace entry.** The SDK marks it invalid,
+  skips `execute` and hands the model a `tool-error` to retry from -- correct behaviour, but it
+  means the `traced()` wrapper never sees the call. `recordInputError` existed for exactly this and
+  was unwired; an `onStepFinish` hook now records it, observation only.
 - **A tool failure reported the abort instead of the cause**, because the abort is what
   `generateText` throws once the trace has aborted the run. `firstInfraError()` is now consulted
   first.
@@ -163,7 +164,7 @@ the audit found and I did fix is listed separately at the end, so the record is 
 
 | | |
 |---|---|
-| `TZ=UTC pnpm -C api test` | 123 unit — policy, dates, guardrails, extraction, tracing, agent runner |
+| `TZ=UTC pnpm -C api test` | 124 unit — policy, dates, guardrails, extraction, tracing, agent runner |
 | `pnpm -C api test:e2e` | 66 e2e — real Postgres, mocked model, full route and error matrix |
 | `pnpm -C web test` | 27 — the cards and the one-proposal rule |
 | `pnpm -C mobile test` | 16 — the same, on React Native |

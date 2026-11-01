@@ -49,6 +49,31 @@ function runnerWith(toolsFactory: ToolsFactory, ...steps: unknown[]): AgentRunne
 }
 
 describe('AgentRunner', () => {
+  it('records a tool call whose arguments fail the schema, which never reaches execute', async () => {
+    // The SDK marks such a call invalid, skips execute and hands the model a tool-error to retry
+    // from -- so the traced() wrapper never sees it and it was missing from the trace entirely.
+    // TASK.md's trace is "every tool call, in order".
+    const toolsFactory = stubToolsFactory({ items: [], total: 0 });
+    const runner = runnerWith(
+      toolsFactory,
+      toolCallStep('call-bad', 'search_properties', { bedroomsMin: 'not a number' }),
+      textStep({ recommendations: [], summary: 'Nothing.', reply: 'Nothing.', followUpTask: null }),
+    );
+
+    const result = await runner.run({
+      agencyId: 'agency-1',
+      agencyName: 'Marina Bay',
+      agentName: 'Sara',
+      requirements: REQUIREMENTS,
+    });
+
+    const entries = result.trace.toContract();
+    const bad = entries.find((entry) => entry.error !== undefined);
+    expect(bad).toBeDefined();
+    expect(bad?.tool).toBe('search_properties');
+    expect(bad?.error).toBeTruthy();
+  });
+
   it("reports a tool's real failure, not the abort it triggers", async () => {
     // The infra failure aborts the run, so whatever generateText throws afterwards is the abort.
     // The run's `error` field is the first thing anyone reads, so it has to name the cause.

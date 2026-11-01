@@ -18,6 +18,11 @@ export interface AgentRunResult {
   trace: Trace;
 }
 
+/** The SDK types a tool-error's `error` as `unknown`, so it is narrowed in one place. */
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 @Injectable()
 export class AgentRunner {
   constructor(
@@ -63,6 +68,18 @@ export class AgentRunner {
         stopWhen: stepCountIs(8),
         output: Output.object({ schema: FinalSchema }),
         abortSignal: abortController.signal,
+        // A tool call whose arguments fail the schema never reaches `execute` -- the SDK marks it
+        // invalid, skips execution and hands the model a `tool-error` part to retry from. Correct
+        // behaviour (architecture section 3.6: an input error goes back to the model and does not
+        // fail the run), but it means the `traced()` wrapper never sees the call, so it was missing
+        // from the trace entirely. TASK.md's `trace` is "every tool call, in order", so it is
+        // recorded here instead. Observation only -- nothing about the run changes.
+        onStepFinish: ({ content }) => {
+          for (const part of content) {
+            if (part.type !== 'tool-error') continue;
+            trace.recordInputError(part.toolCallId, part.toolName, part.input, errorText(part.error));
+          }
+        },
       });
       return { output: result.output, trace };
     } catch (error) {
