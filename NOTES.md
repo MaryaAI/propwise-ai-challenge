@@ -155,7 +155,14 @@ the audit found and I did fix is listed separately at the end, so the record is 
    shape.
 8. **`compare_properties` and mobile chat were cut**, in that order, as the plan's cut line
    intended.
-9. **`docs/ARCHITECTURE_AND_PLAN.md` is about half Arabic** and is superseded in roughly twenty
+9. **The e2e suite's startup is intermittently flaky — roughly 1 run in 4.** The failure is in
+   `app.e2e-spec.ts`'s `beforeAll` (compiling the Nest module and `app.listen`), never in an
+   assertion: the same file passes 12/12 run alone, and the full 66 passed three times in a row
+   afterwards. Most likely pool or bind contention, since all three suites run `--runInBand`
+   against one database and each opens its own connection pool. If `pnpm check` fails at a suite
+   boundary rather than on an expectation, re-run it. Not diagnosed further, and not papered over
+   with a retry.
+10. **`docs/ARCHITECTURE_AND_PLAN.md` is about half Arabic** and is superseded in roughly twenty
     places by `PLAN.md`'s amendments. It is kept as the original design record those amendments
     reference by section, not as a description of the current code.
 
