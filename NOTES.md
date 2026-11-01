@@ -60,6 +60,28 @@ pnpm check                          # typecheck + tests, all three apps (233 tes
 The eval suite resets the test database itself, so running it twice in a row is the
 "same verdicts twice" check. It needs a funded key — every route makes at least one model call.
 
+### Running it without the assessment key
+
+`ANTHROPIC_API_KEY` is the supported path and the default. For local development there is one
+escape hatch, used when that key ran out of credit:
+
+```bash
+# in api/.env — routes the model through OpenRouter's OpenAI-compatible API instead
+OPENROUTER_API_KEY=sk-or-v1-...
+ASSISTANT_MODEL=nvidia/nemotron-3.5-super-vl:free     # free, and verified to work
+```
+
+Unset in a normal checkout, so nothing about the delivered behaviour changes — the graders get
+Anthropic. Two things to know if you use it: model ids there carry a provider prefix
+(`anthropic/claude-sonnet-4.5`, not a bare name), and structured output depends on the chosen model
+supporting `json_schema`, so extraction is the first thing to break on a weak model.
+
+**What a free model does and does not manage.** Verified live: extraction (English and Arabic),
+routing, the template routes, the follow-up date in the agent's timezone, and approve creating a
+task — eval cases `12-rent-priya` and `3-no-suitable-lina` both pass on it. What it does not do is
+call the tools, so the `search` route returns no recommendations. That is model capability, not a
+code path: on Karim it extracted every field correctly and still searched nothing.
+
 ## Decisions I would defend
 
 **The model never writes, and never decides a fact.** It has two read-only tools and no write tool,
@@ -145,6 +167,10 @@ the audit found and I did fix is listed separately at the end, so the record is 
   matching runs 5% higher for "around". Now exposed as `extraction.budgetEffectiveMaxAed` with a
   `budget_tolerance` entry in `steps`.
 - **A fabricated `budget.minAed` went unchallenged**, silently dropping cheaper listings that fit.
+  *Since confirmed on a live model*: analysing Karim through a free OpenRouter model, the model did
+  emit `minAed: 2000000` from "around 2M AED", and the fix rejected it with
+  `a "around" budget does not support a minimum of 2000000` in `steps`. Without it, MBR-1007 and
+  MBR-1002 would have been dropped.
   Amount-matching could not catch it ("around 2M AED" contains 2,000,000, so a phantom minimum
   matches the quote as well as the real maximum does), so the **qualifier** now decides which
   bounds may exist: "around"/"under"/"up_to" assert a ceiling only, "from" a floor only,
