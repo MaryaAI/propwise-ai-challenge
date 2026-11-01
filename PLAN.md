@@ -40,7 +40,7 @@ Done when: a `curl` against Karim's lead returns the expected result in under a 
 - [x] `agent-runner.ts` + agent prompt + `FinalSchema` — 3b
 - [x] `templates.ts` for the no-agent routes — 3b
 - [x] `assistant.service.ts` (stages 1→7, 100s `AbortSignal`) + `assistant.mapper.ts` — 3c, mocked e2e only; real `curl` against Karim/Lina/Alex/Priya/Hassan still pending (see note below)
-- [ ] Manual `curl` against Karim, Lina, Alex, Priya, Hassan, compared against the expected tables — **deferred**: a short follow-up round, spends real API budget
+- [ ] Manual `curl` against Karim, Lina, Alex, Priya, Hassan, compared against the expected tables — **blocked**: needs a funded Anthropic key (A19)
 - [x] Commit
 
 ## Phase 4 — Routes (30 min)
@@ -78,7 +78,7 @@ Done when: eval case 13 and case 7's chat form pass, and 5b's chat follow-up (ge
 Done when: analyze → approve → task appears in Tasks on web, and mobile shows the same result.
 
 - [x] Web: `api.ts` → `ActionCard` (+ Vitest test) → `RunCard` (+ test) → `AssistantPanel` (load latest run, analyze, chat) → `onTaskCreated` wired into the lead page
-- [~] Manual check against a live `TZ=UTC pnpm dev:api`: the panel's mount call, the 404/400 error paths and the failed-run shape all verified; **`analyze → approve → task appears` still owed** — it needs one live model call and the key returns `invalid x-api-key` (see A17)
+- [~] Manual check against a live `TZ=UTC pnpm dev:api`: the panel's mount call, the 404/400 error paths and the failed-run shape all verified; **`analyze → approve → task appears` still owed** — it needs one live model call; the replacement key authenticates but the Anthropic account has no credit balance (see A17, A19)
 - [x] Mobile: `api.ts` → `RunCard`/`ActionCard` → `AssistantPanel` (no chat, per the cut line); **Expo Go run still owed**, same blocker
 - [x] `pnpm -C web test` (27) and `pnpm -C mobile test` (16) green, then commit
 
@@ -89,7 +89,7 @@ Done when: the delivery checklist (TASK.md's "When time is up") is complete.
 - [x] Independent review against `TASK.md` by a pass with no prior context (see A18)
 - [x] Fix genuine violations found — the `closed` injection hole, and the undisclosed budget ceiling
 - [x] `NOTES.md`
-- [~] `pnpm db:reset` → `pnpm check` green; **`pnpm -C api eval` not re-run** — `invalid x-api-key`, and running it would overwrite the committed 17/17 with an auth-failure 0/17 (A16)
+- [~] `pnpm db:reset` → `pnpm check` green; **`pnpm -C api eval` not re-run** — no credit balance on the Anthropic account, and running it would overwrite the committed 17/17 with a 0/17 that failed for a billing reason (A16, A19)
 - [x] `TZ=UTC pnpm dev:api` smoke test
 - [x] Final commit, `git status` clean, `phase-6-chat` merged into `main`
 
@@ -129,6 +129,7 @@ Done when: the delivery checklist (TASK.md's "When time is up") is complete.
 - **A11 — two real bugs found finishing Phase 3/4:**
   - `AgentRunner`'s 3b catch block discarded the trace on every failure path, even though architecture section 3.8 explicitly requires trace/steps to survive a failed run for diagnosis. Fixed: `AgentFailedError` now carries the trace, and any other rethrown error (`ToolInfraError`, an abort) gets `.trace` attached generically before leaving `AgentRunner.run()`, so `assistant.service.ts`'s failure path can still persist whatever tool calls happened before the failure.
   - `AssistantController`'s `approve`/`reject` routes returned `201 Created` instead of the contract's `200` — Nest's `@Post()` defaults to 201 unless told otherwise. Caught immediately by the new e2e spec (4 failing assertions, all `expected 200, got 201`); fixed with `@HttpCode(200)` on both routes.
+- **A19 — the API key ran out, which is what still blocks the last three items.** The original assessment key began returning `invalid x-api-key`; a replacement authenticates but the account has no credit balance ("Your credit balance is too low to access the Anthropic API"). Every route makes at least one model call -- even the template routes still run extraction -- so none of the three remaining items can be faked or worked around: the eval re-run, the `analyze → approve → task appears` walkthrough, and Phase 3's manual `curl` round. This is TASK.md's own "It has a spend limit. If it runs out, tell us." The turn that would have gone on those was spent instead on the four code-level audit findings that need no model call (escaping, budget bounds, the infra-failure cause, and the missing trace entry for an invalid tool call), each with a regression test verified to fail without its fix.
 - **A18 — the closing compliance audit (Phase 8):** an independent pass with no prior context went through `TASK.md` requirement by requirement against the code rather than the documentation. It confirmed what matters most — agency scoping complete across all 23 query sites in `api/src/assistant`, no model-reachable write (exactly two `tool()` definitions, both pure `SELECT`), the contract matching field for field including the literal failed-run shape, and the whole diff outside the assistant module being **13 added lines, 0 removed** with `seed/*.json` byte-identical. Two findings were fixed:
   - **`closed` was the one genuine injection hole.** It reached the router ungated while every other decision input was evidence-checked, so text that persuaded the model to set it sent the run to the `closed` route — no follow-up proposed, and a summary saying the lead is no longer interested. Now evidence-gated like the rest, with the rejection recorded in `steps`. `intent` is deliberately left ungated: it is a routing classification, not a claim about the lead, and cannot suppress the action alone.
   - **The matching ceiling was undisclosed.** `budgetAed.max` reports what the lead said (2,000,000 for "around 2M") while matching runs to 2,100,000, so a recommendation can sit above the budget in the same payload. `budgetAed` stays literal — that is what "what was understood" means — and the real ceiling is now exposed as `extraction.budgetEffectiveMaxAed` with a `budget_tolerance` entry in `steps`. It goes in `extraction` rather than inside `budgetAed` because adding a key to an existing contract field would change its shape, which TASK.md forbids.
