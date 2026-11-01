@@ -17,6 +17,23 @@ export function normalizeText(s: string): string {
   return out;
 }
 
+/**
+ * Makes untrusted text safe to interpolate between prompt tags.
+ *
+ * Lead messages and listing descriptions are wrapped in tags like `<lead_message>` so the model
+ * knows they are data. A body containing a literal `</lead_message>` would close its own tag, and
+ * everything after it would read as top-level prompt text -- including a forged
+ * `Agent instruction:` line, which is the extractor's trusted channel. Neutralising `<` and `>`
+ * removes the ability to close a tag or open a new one at all.
+ *
+ * Deliberately NOT part of `normalizeText`: that function feeds `quoteExists`, and evidence quotes
+ * are matched against the original body. Escaping there would make a quote containing a bracket
+ * unverifiable.
+ */
+export function escapeForPrompt(text: string): string {
+  return text.replace(/</g, '‹').replace(/>/g, '›');
+}
+
 export function quoteExists(quote: string, source: string): boolean {
   const normalizedQuote = normalizeText(quote);
   if (normalizedQuote === '') return false;

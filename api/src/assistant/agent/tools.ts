@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { tool } from 'ai';
 import { z } from 'zod';
+import { escapeForPrompt } from '../extraction/normalize';
 import { PropertyQuery, SearchFilters } from './property-query';
 import { Trace, ToolInputError } from './tracing';
 
@@ -53,7 +54,13 @@ export class ToolsFactory {
         return {
           found: true,
           property: propertyWithoutDescription,
-          description: `<listing_description>${description}</listing_description>`,
+          // Defence in depth. Tool results are JSON-encoded before the model sees them, so a
+          // `</listing_description>` in the text is already just a character in a string value --
+          // unlike the extraction prompt, which is raw text and where the breakout is real. Escaped
+          // anyway, so this does not depend on how the SDK happens to render tool output.
+          // MBR-1019's seeded description is a live payload telling assistants to ignore their
+          // instructions, which is what makes this worth belt-and-braces.
+          description: `<listing_description>${escapeForPrompt(description)}</listing_description>`,
         };
       }),
     });

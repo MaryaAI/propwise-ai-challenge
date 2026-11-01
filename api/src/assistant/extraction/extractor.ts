@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { generateText, NoObjectGeneratedError, Output } from 'ai';
 import { AssistantModelFactory, ASSISTANT_MODEL_FACTORY } from '../model';
-import { Evidence, FollowUpTiming, RequirementsState, Sourced } from '../types';
+import { BudgetQualifier, Evidence, FollowUpTiming, RequirementsState, Sourced } from '../types';
 import { amountMatchesEvidence, quoteExists } from './normalize';
 import { Extraction, ExtractionSchema } from './extraction.schema';
 import {
@@ -29,6 +29,13 @@ export interface ExtractionResult {
 }
 
 type ExtractionField<T> = { value: T | null; evidence: Evidence; status: 'stated' | 'missing' | 'ambiguous' };
+
+/**
+ * Which bounds each budget wording actually asserts. "around 2M" is a ceiling and says nothing
+ * about a floor; "from 2M" is the reverse; "between 1.5M and 2M" and "exactly 2M" assert both.
+ */
+const IMPLIES_FLOOR = new Set<BudgetQualifier>(['from', 'between', 'exact']);
+const IMPLIES_CEILING = new Set<BudgetQualifier>(['around', 'under', 'up_to', 'between', 'exact']);
 
 function sourced<T>(value: T, evidence: Evidence): Sourced<T> {
   return { value, source: evidence.sourceId, evidence };
@@ -122,11 +129,27 @@ export class Extractor {
     if (hasValidEvidence(raw.budget) && raw.budget.value) {
       const { minAed, maxAed, qualifier } = raw.budget.value;
       const quote = raw.budget.evidence.quote;
-      const claimed = maxAed ?? minAed;
-      if (claimed === null || amountMatchesEvidence(claimed, quote)) {
-        update.budget = sourced({ minAed, maxAed, qualifier }, raw.budget.evidence);
-      } else {
-        rejected.push({ field: 'budget', reason: `claimed amount does not match the evidence quote "${quote}"` });
+      // Each end has to be supported by the wording, not just by a number appearing somewhere in
+      // it. Amount-matching alone cannot tell a floor from a ceiling: "around 2M AED" contains
+      // 2,000,000, so a fabricated `minAed: 2000000` matches the quote just as well as the real
+      // max does. That is not harmless -- `filterRecommendations` rejects anything below the
+      // minimum, so a phantom floor silently drops cheaper listings that genuinely fit.
+      //
+      // The qualifier is the evidence for which bound was meant, so it decides which ends can
+      // survive; the amount check then confirms the figure itself.
+      const keptMin = minAed !== null && IMPLIES_FLOOR.has(qualifier) && amountMatchesEvidence(minAed, quote) ? minAed : null;
+      const keptMax = maxAed !== null && IMPLIES_CEILING.has(qualifier) && amountMatchesEvidence(maxAed, quote) ? maxAed : null;
+
+      if (minAed !== null && keptMin === null) {
+        rejected.push({ field: 'budget.minAed', reason: `a "${qualifier}" budget does not support a minimum of ${minAed}` });
+      }
+      if (maxAed !== null && keptMax === null) {
+        rejected.push({ field: 'budget.maxAed', reason: `a "${qualifier}" budget does not support a maximum of ${maxAed}` });
+      }
+
+      // A budget with neither end left says nothing, so it is not merged at all.
+      if (keptMin !== null || keptMax !== null) {
+        update.budget = sourced({ minAed: keptMin, maxAed: keptMax, qualifier }, raw.budget.evidence);
       }
     } else if (raw.budget.status === 'stated') {
       rejected.push({ field: 'budget', reason: 'evidence quote not found in the cited message' });

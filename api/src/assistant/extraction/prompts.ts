@@ -1,3 +1,5 @@
+import { escapeForPrompt } from './normalize';
+
 export interface ConversationMessage {
   id: string;
   direction: 'inbound' | 'outbound';
@@ -41,8 +43,10 @@ export function buildExtractionUserPrompt(input: {
   currentRequirements?: unknown;
 }): string {
   const areasBlock = `<areas>${input.areas.join(' | ')}</areas>`;
+  // Bodies are escaped so a message cannot close its own tag and escalate to top-level prompt
+  // text. The evidence check still runs against the UNescaped body, so quotes stay verifiable.
   const conversationBlock = `<conversation>\n${input.conversation
-    .map((m) => `<lead_message id="${m.id}" direction="${m.direction}" sentAt="${m.sentAt}">${m.body}</lead_message>`)
+    .map((m) => `<lead_message id="${m.id}" direction="${m.direction}" sentAt="${m.sentAt}">${escapeForPrompt(m.body)}</lead_message>`)
     .join('\n')}\n</conversation>`;
   const analysedBlock = `<analysed_message id="${input.analysedMessageId}"/>`;
 

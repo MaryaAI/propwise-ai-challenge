@@ -103,6 +103,62 @@ describe('Extractor', () => {
     expect(result.rejected).toContainEqual({ field: 'propertyType', reason: 'evidence quote not found in the cited message' });
   });
 
+  describe('both ends of a budget are checked against the evidence', () => {
+    it('drops a minimum the lead never stated, and keeps the maximum', async () => {
+      // A hallucinated floor is not harmless: the guardrails reject anything below it, so it
+      // silently drops cheaper listings that do fit. Karim said "around 2M AED" and no minimum.
+      const extraction = karimExtraction();
+      extraction.budget = {
+        value: { minAed: 2_000_000, maxAed: 2_000_000, qualifier: 'around' },
+        evidence: { sourceId: 'msg-1', quote: 'around 2M AED' },
+        status: 'stated',
+      };
+      const extractor = extractorWith(textResult(extraction));
+
+      const result = await extractor.extract(BASE_INPUT);
+
+      expect(result.update.budget?.value).toEqual({ minAed: null, maxAed: 2_000_000, qualifier: 'around' });
+      expect(result.rejected).toContainEqual({
+        field: 'budget.minAed',
+        reason: 'a "around" budget does not support a minimum of 2000000',
+      });
+    });
+
+    it('keeps both ends when the quote supports both', async () => {
+      const between: ConversationMessage = {
+        id: 'msg-between',
+        direction: 'inbound',
+        sentAt: '2026-10-30T08:00:00Z',
+        body: 'Looking between 1.5M and 2M AED.',
+      };
+      const extraction = karimExtraction();
+      extraction.budget = {
+        value: { minAed: 1_500_000, maxAed: 2_000_000, qualifier: 'between' },
+        evidence: { sourceId: 'msg-between', quote: 'between 1.5M and 2M AED' },
+        status: 'stated',
+      };
+      const extractor = extractorWith(textResult(extraction));
+
+      const result = await extractor.extract({ ...BASE_INPUT, conversation: [KARIM_MESSAGE, between] });
+
+      expect(result.update.budget?.value).toEqual({ minAed: 1_500_000, maxAed: 2_000_000, qualifier: 'between' });
+    });
+
+    it('merges no budget at all when neither end survives', async () => {
+      const extraction = karimExtraction();
+      extraction.budget = {
+        value: { minAed: 900_000, maxAed: 3_000_000, qualifier: 'between' },
+        evidence: { sourceId: 'msg-1', quote: 'around 2M AED' },
+        status: 'stated',
+      };
+      const extractor = extractorWith(textResult(extraction));
+
+      const result = await extractor.extract(BASE_INPUT);
+
+      expect(result.update.budget).toBeUndefined();
+    });
+  });
+
   describe('closing a lead needs the lead to have said so', () => {
     const CLOSED_MESSAGE: ConversationMessage = {
       id: 'msg-closed',
