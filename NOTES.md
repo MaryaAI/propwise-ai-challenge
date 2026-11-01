@@ -54,11 +54,11 @@ pnpm dev:mobile                     # Expo
 
 pnpm -C api eval                    # the eval suite -> api/evals/REPORT.md + traces/
 pnpm -C api eval --case 2-matching-karim    # one case
-pnpm check                          # typecheck + tests, all three apps (218 tests)
+pnpm check                          # typecheck + tests, all three apps (232 tests)
 ```
 
 The eval suite resets the test database itself, so running it twice in a row is the
-"same verdicts twice" check. It needs a working key — every route makes at least one model call.
+"same verdicts twice" check. It needs a funded key — every route makes at least one model call.
 
 ## Decisions I would defend
 
@@ -98,53 +98,72 @@ recommendations and empty actions — never "no matching properties".
 
 ## What is weak or missing
 
-Honest list. The first two are blockers I could not clear; the rest are known and unfixed.
+Honest list. The first two are blockers I could not clear; the rest are known and unfixed. What
+the audit found and I did fix is listed separately at the end, so the record is complete.
 
-1. **The committed eval report is stale.** `api/evals/REPORT.md` shows 17/17, but it was generated
-   *before* the six fixes in `fix(assistant): six defects found reviewing phase 6`.
-   `traces/13-chat-narrowing.json` still shows the `dueAt: null` bug that commit fixed. The
-   assessment key now returns `invalid x-api-key`, so it cannot be regenerated —
-   **`pnpm -C api eval` needs re-running with a working key.** Those six fixes are covered instead
-   by three e2e regression tests that each fail without them.
+1. **The committed eval report is stale, and cannot currently be regenerated.** `api/evals/REPORT.md`
+   shows 17/17, but it was generated *before* the six fixes in `fix(assistant): six defects found
+   reviewing phase 6` and the four that followed. `traces/13-chat-narrowing.json` still shows the
+   `dueAt: null` bug that commit fixed. The first key returned `invalid x-api-key`; a replacement
+   key authenticates but the account has **no credit balance** ("Your credit balance is too low to
+   access the Anthropic API"). Every route makes at least one model call, so nothing can be
+   re-run — **`pnpm -C api eval` needs a funded key.** This is the "if it runs out, tell us" case.
+   The fixes are covered instead by regression tests that each fail without them.
 2. **"Same verdicts twice" is unverified against the shipped code**, for the same reason. No
    sampling parameters are set anywhere, so the model runs at the provider default; the assertions
    are written as sets and orderings rather than exact matches to tolerate that.
-3. **A hallucinated `budget.minAed` is not challenged.** The evidence check validates
-   `maxAed ?? minAed`, so only the larger amount is scrutinised. Committed traces show `minAed`
-   set to 2,000,000 for Karim, which silently dropped MBR-1007 and MBR-1002 from his shortlist.
-4. **A tool-infrastructure failure reports the wrong cause.** `Trace.firstInfraError()` exists but
-   is never called, so the run's `error` is whatever escaped the abort rather than the real reason.
-   The trace entry carries the truth; the `error` string does not.
-5. **A tool call whose arguments fail validation leaves no trace entry.** `recordInputError` is
-   unwired (no `onStepFinish`), so "every tool call, in order" has a gap for that one case.
-6. **`5b-injection-description-mbr1019` passes vacuously.** MBR-1019 is a 4-bed 6.2M villa that
+3. **A tool call whose arguments fail validation leaves no trace entry.** `recordInputError` is
+   unwired (no `onStepFinish`), so "every tool call, in order" has a gap for that one case. The
+   call is rejected by the SDK before `execute` runs, so nothing reaches the trace.
+4. **`5b-injection-description-mbr1019` passes vacuously.** MBR-1019 is a 4-bed 6.2M villa that
    never entered the model's context for a 2-bed Marina lead, so the assertion proves little.
    `5c-injection-chat-mbr1019` is the real test — it forces a `get_property` on it first.
-7. **The two date eval cases are tautological** — they compute the expected value with
+5. **The two date eval cases are tautological** — they compute the expected value with
    `computeDueAt`, the function under test, because seed timestamps are relative to "now" and
    cannot be hardcoded. They prove the service wires the right `sentAt` through; the date maths
    itself is proven by `follow-up-date.spec.ts`, which hardcodes a Friday → Saturday case.
-8. **`intent` is not evidence-gated**, and `summary`, `reply` and the task title/notes are free
-   model prose. The recommendation *list* is injection-proof; the text Sara reads is not.
-9. **Untrusted text is interpolated into the prompt without escaping.** A message body containing
-   a literal `</lead_message>` could close its tag. It cannot forge the agent's trusted channel
-   (that id only resolves on a chat turn, and the quote must be in Sara's own text) and it cannot
-   add a recommendation or write anything, but the prose channel is reachable.
-10. **`guardrails.ts`'s `other_agency` check cannot fire** — the SQL `WHERE` already filtered the
-    row. Isolation is real, but that particular line reads as more defence than it provides.
-11. **Not verified end to end**: `analyze → approve → task appears` in a browser, the Expo Go run,
-    and a manual `curl` round against all five seed leads. All three need one live model call.
-12. **`compare_properties` and mobile chat were cut**, in that order, as the plan's cut line
-    intended.
-13. **`docs/ARCHITECTURE_AND_PLAN.md` is about half Arabic** and is superseded in roughly twenty
+6. **`intent` is not evidence-gated**, and `summary`, `reply` and the task title/notes are free
+   model prose. The recommendation *list* is injection-proof; the text Sara reads is not. `intent`
+   is a routing classification rather than a claim about the lead, and cannot suppress the action
+   on its own — unlike `closed`, which is gated.
+7. **`guardrails.ts`'s `other_agency` check cannot fire** — the SQL `WHERE` already filtered the
+   row, so a cross-agency id falls through as `not_found`. Isolation is real and tested; that
+   particular line just reads as more defence than it provides.
+8. **Not verified end to end**: `analyze → approve → task appears` in a browser, the Expo Go run,
+   and a manual `curl` round against all five seed leads. All three need one live model call. What
+   *was* verified against a live `TZ=UTC pnpm dev:api`: the panel's mount call, the 404/400 error
+   paths, the tasks endpoint, and a real analyse returning `201` with the documented failed-run
+   shape.
+9. **`compare_properties` and mobile chat were cut**, in that order, as the plan's cut line
+   intended.
+10. **`docs/ARCHITECTURE_AND_PLAN.md` is about half Arabic** and is superseded in roughly twenty
     places by `PLAN.md`'s amendments. It is kept as the original design record those amendments
     reference by section, not as a description of the current code.
+
+### Fixed after the audit, listed because they were real
+
+- **`closed` was not evidence-gated**, so text that talked the model into it suppressed the
+  follow-up and reported the lead as no longer interested. Now gated like every other field.
+- **The matching ceiling was undisclosed** — `budgetAed.max` reports what the lead said while
+  matching runs 5% higher for "around". Now exposed as `extraction.budgetEffectiveMaxAed` with a
+  `budget_tolerance` entry in `steps`.
+- **A fabricated `budget.minAed` went unchallenged**, silently dropping cheaper listings that fit.
+  Amount-matching could not catch it ("around 2M AED" contains 2,000,000, so a phantom minimum
+  matches the quote as well as the real maximum does), so the **qualifier** now decides which
+  bounds may exist: "around"/"under"/"up_to" assert a ceiling only, "from" a floor only,
+  "between"/"exact" both.
+- **Untrusted text was interpolated into the prompt unescaped**, so a body containing
+  `</lead_message>` could close its own tag and escalate to top-level prompt text. Now escaped,
+  with the evidence check still running against the unescaped body so quotes stay verifiable.
+- **A tool failure reported the abort instead of the cause**, because the abort is what
+  `generateText` throws once the trace has aborted the run. `firstInfraError()` is now consulted
+  first.
 
 ## Tests
 
 | | |
 |---|---|
-| `TZ=UTC pnpm -C api test` | 116 unit — policy, dates, guardrails, extraction, tracing, agent runner |
+| `TZ=UTC pnpm -C api test` | 123 unit — policy, dates, guardrails, extraction, tracing, agent runner |
 | `pnpm -C api test:e2e` | 66 e2e — real Postgres, mocked model, full route and error matrix |
 | `pnpm -C web test` | 27 — the cards and the one-proposal rule |
 | `pnpm -C mobile test` | 16 — the same, on React Native |
