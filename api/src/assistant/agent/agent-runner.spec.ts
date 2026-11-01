@@ -49,6 +49,19 @@ function runnerWith(toolsFactory: ToolsFactory, ...steps: unknown[]): AgentRunne
 }
 
 describe('AgentRunner', () => {
+  it("reports a tool's real failure, not the abort it triggers", async () => {
+    // The infra failure aborts the run, so whatever generateText throws afterwards is the abort.
+    // The run's `error` field is the first thing anyone reads, so it has to name the cause.
+    const propertyQuery = {
+      search: jest.fn().mockRejectedValue(new Error('connection refused')),
+    } as unknown as PropertyQuery;
+    const runner = runnerWith(new ToolsFactory(propertyQuery), toolCallStep('call-1', 'search_properties', { areas: ['Dubai Marina'] }));
+
+    await expect(runner.run({ agencyId: 'agency-1', agencyName: 'Marina Bay', agentName: 'Sara', requirements: REQUIREMENTS })).rejects.toThrow(
+      /connection refused/,
+    );
+  });
+
   it('runs a tool call then resolves the final structured output, with the call captured in the trace', async () => {
     const toolsFactory = stubToolsFactory({ items: [{ id: 'prop-1', reference: 'MBR-1001' }], total: 1 });
     const runner = runnerWith(

@@ -66,11 +66,19 @@ export class AgentRunner {
       });
       return { output: result.output, trace };
     } catch (error) {
+      // A tool's infrastructure failure aborts the run, so what `generateText` throws afterwards is
+      // the abort ("This operation was aborted"), not the cause. The trace recorded the real reason
+      // when the tool failed, so report that instead -- otherwise the run's `error` field, which is
+      // the first thing anyone reads, names the symptom and hides the cause.
+      if (trace.hasInfraFailure()) {
+        throw new AgentFailedError(trace.firstInfraError() ?? 'A tool failed.', trace);
+      }
       if (NoOutputGeneratedError.isInstance(error) || NoObjectGeneratedError.isInstance(error)) {
         throw new AgentFailedError(error.message, trace);
       }
-      // Any other error (ToolInfraError, an abort, ...) propagates as-is, but still carries the
-      // trace gathered so far -- architecture section 3.8: trace/steps survive a failed run for diagnosis.
+      // Anything else (an abort from the run timeout, a network error, ...) propagates as-is, but
+      // still carries the trace gathered so far -- architecture section 3.8: trace/steps survive a
+      // failed run for diagnosis.
       if (error instanceof Error) (error as Error & { trace?: Trace }).trace = trace;
       throw error;
     }
